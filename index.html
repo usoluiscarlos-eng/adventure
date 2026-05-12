@@ -46,6 +46,7 @@
 <body>
   <div id="root"></div>
 
+  <!-- Script de Registro del Service Worker y Firebase -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
@@ -54,8 +55,27 @@
     }
   </script>
 
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, setDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // Exponer Firebase al entorno global para que React (Babel) pueda usarlo
+    window.FirebaseUtils = {
+      initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged,
+      getFirestore, doc, setDoc, onSnapshot, collection
+    };
+    window.dispatchEvent(new Event('firebase-ready'));
+  </script>
+
   <script type="text/babel">
-    const { useState, useEffect, useMemo } = React;
+    const { useState, useEffect, useMemo, useCallback, useRef } = React;
+
+    // --- INSTRUCCIONES PARA DESPLIEGUE EXTERNO (GITHUB PAGES) ---
+    // Esta plataforma de pruebas inyecta su propia base de datos temporalmente.
+    // Cuando subas este código a GitHub, necesitarás tu propia base de datos gratuita de Firebase.
+    // Reemplaza 'null' con tu objeto de configuración (ej. { apiKey: "XXX", projectId: "XXX", ... })
+    const EXTERNAL_FIREBASE_CONFIG = null;
 
     // --- ICONOS COMPATIBLES ---
     const IconWrapper = ({ children, className = "", ...props }) => (
@@ -82,13 +102,11 @@
     const Clock = (p) => <IconWrapper {...p}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></IconWrapper>;
     const BarChart = (p) => <IconWrapper {...p}><line x1="12" x2="12" y1="20" y2="10"/><line x1="18" x2="18" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="16"/></IconWrapper>;
     
-    // Nuevos Iconos Analíticas
     const Flame = (p) => <IconWrapper {...p}><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></IconWrapper>;
     const Trophy = (p) => <IconWrapper {...p}><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></IconWrapper>;
     const Zap = (p) => <IconWrapper {...p}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></IconWrapper>;
     const AlertTriangle = (p) => <IconWrapper {...p}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></IconWrapper>;
 
-    // --- CONFIGURACIÓN DE CATEGORÍAS ---
     const CATEGORIES = {
       'salud': { label: 'Salud', color: 'text-rose-400', bg: 'bg-rose-500/20', bar: 'bg-rose-500' },
       'alimentacion': { label: 'Alimentación', color: 'text-orange-400', bg: 'bg-orange-500/20', bar: 'bg-orange-500' },
@@ -98,7 +116,6 @@
       'desarrollo': { label: 'Desarrollo', color: 'text-purple-400', bg: 'bg-purple-500/20', bar: 'bg-purple-500' }
     };
 
-    // --- DATA INICIAL ---
     const INITIAL_HABITS_TEMPLATE = [
       { id: 1, startTime: '06:30', endTime: '06:50', text: 'Despertarse y tomar agua', category: 'salud' },
       { id: 2, startTime: '06:45', endTime: '07:00', text: 'Estiramientos corporales', category: 'salud' },
@@ -124,56 +141,163 @@
     
     const getTodayString = () => getLocalString(new Date());
 
-    // --- HOOK PERSONALIZADO PARA LOCALSTORAGE ---
-    const useLocalStorage = (key, initialValue) => {
-      const [state, setState] = useState(() => {
-        try {
-          const item = window.localStorage.getItem(key);
-          return item ? JSON.parse(item) : initialValue;
-        } catch (error) {
-          console.warn("Error leyendo localStorage", error);
-          return initialValue;
-        }
-      });
-
-      useEffect(() => {
-        try {
-          window.localStorage.setItem(key, JSON.stringify(state));
-        } catch (error) {
-          console.warn("Error guardando en localStorage", error);
-        }
-      }, [key, state]);
-
-      return [state, setState];
-    };
-
-    function App() {
-      const [activeTab, setActiveTab] = useState('habits');
-
-      // --- ESTADOS (AHORA CON PERSISTENCIA LOCAL) ---
-      const [habitsList, setHabitsList] = useLocalStorage('adv_habitsList', INITIAL_HABITS_TEMPLATE);
-      const [habitCompletions, setHabitCompletions] = useLocalStorage('adv_habitCompletions', {}); 
-      const [selectedDate, setSelectedDate] = useState(getTodayString());
-      const [isEditingHabits, setIsEditingHabits] = useState(false);
-      const [newHabit, setNewHabit] = useState({ text: '', startTime: '', endTime: '', category: 'rutina' });
-
-      const [finances, setFinances] = useLocalStorage('adv_finances', []);
-      const [financeForm, setFinanceForm] = useState({ type: 'ingreso', amount: '', description: '' });
-      
-      const [globalGoal, setGlobalGoal] = useLocalStorage('adv_globalGoal', 'Lanzar mi emprendimiento principal este mes');
-      const [expandedDay, setExpandedDay] = useState('Lunes');
-      const [weeklyGoals, setWeeklyGoals] = useLocalStorage('adv_weeklyGoals', WEEK_DAYS.map(day => ({ day, dailyGoal: '', tasks: [] })));
-      const [newTask, setNewTask] = useState({ text: '', time: '' });
-
-      const [healthLogs, setHealthLogs] = useLocalStorage('adv_healthLogs', []);
-      const [healthForm, setHealthForm] = useState({ meal: '', symptoms: 'Ninguno', painLevel: 1 });
-      const [gymRoutine, setGymRoutine] = useLocalStorage('adv_gymRoutine', [
+    // --- ESTRUCTURA PRINCIPAL DE DATOS EN LA NUBE ---
+    const DEFAULT_DATA = {
+      habitsList: INITIAL_HABITS_TEMPLATE,
+      habitCompletions: {},
+      finances: [],
+      globalGoal: 'Lanzar mi emprendimiento principal este mes',
+      weeklyGoals: WEEK_DAYS.map(day => ({ day, dailyGoal: '', tasks: [] })),
+      healthLogs: [],
+      gymRoutine: [
         { id: 1, day: 'Lunes', focus: 'Pecho y Tríceps', completed: false },
         { id: 2, day: 'Martes', focus: 'Espalda y Bíceps', completed: false },
         { id: 3, day: 'Miércoles', focus: 'Pierna (Cuádriceps)', completed: false },
         { id: 4, day: 'Jueves', focus: 'Hombros y Abdomen', completed: false },
         { id: 5, day: 'Viernes', focus: 'Pierna (Femoral y Glúteo)', completed: false },
-      ]);
+      ]
+    };
+
+    function App() {
+      const [activeTab, setActiveTab] = useState('habits');
+      const [appData, setAppData] = useState(null); // Contiene todo el estado sincronizado
+      const [user, setUser] = useState(null);
+      const userRef = useRef(null);
+
+      // Sincronizar referencia de usuario
+      useEffect(() => { userRef.current = user; }, [user]);
+
+      // --- INICIALIZACIÓN DE FIREBASE ---
+      useEffect(() => {
+        const initFirebase = async () => {
+          try {
+            let firebaseConfigObj = null;
+            
+            // Detecta si está en el entorno de previsualización
+            if (typeof __firebase_config !== 'undefined') {
+               firebaseConfigObj = JSON.parse(__firebase_config);
+            } else if (EXTERNAL_FIREBASE_CONFIG) {
+               firebaseConfigObj = EXTERNAL_FIREBASE_CONFIG;
+            } else {
+               console.warn("Modo Offline activado: No hay configuración de base de datos.");
+               setAppData(DEFAULT_DATA);
+               return; // Si no hay config, arranca en modo local y se salta Firebase
+            }
+            
+            const app = window.FirebaseUtils.initializeApp(firebaseConfigObj);
+            const auth = window.FirebaseUtils.getAuth(app);
+            
+            const initAuth = async () => {
+              if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                await window.FirebaseUtils.signInWithCustomToken(auth, __initial_auth_token);
+              } else {
+                await window.FirebaseUtils.signInAnonymously(auth);
+              }
+            };
+            await initAuth();
+
+            window.FirebaseUtils.onAuthStateChanged(auth, (u) => {
+                setUser(u);
+            });
+          } catch (e) {
+            console.error("Error inicializando nube:", e);
+            setAppData(DEFAULT_DATA);
+          }
+        };
+
+        if (window.FirebaseUtils) {
+            initFirebase();
+        } else {
+            window.addEventListener('firebase-ready', initFirebase);
+            return () => window.removeEventListener('firebase-ready', initFirebase);
+        }
+      }, []);
+
+      // --- SUSCRIPCIÓN EN TIEMPO REAL (ESCUCHA DE LA NUBE) ---
+      useEffect(() => {
+        if (!user || (!EXTERNAL_FIREBASE_CONFIG && typeof __firebase_config === 'undefined')) return;
+        
+        const db = window.FirebaseUtils.getFirestore();
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'adventure-app';
+        const docRef = window.FirebaseUtils.doc(db, 'artifacts', appId, 'users', user.uid, 'appData', 'main');
+
+        const unsubscribe = window.FirebaseUtils.onSnapshot(docRef, (docSnap) => {
+            if (docSnap.exists()) {
+                setAppData({ ...DEFAULT_DATA, ...docSnap.data() });
+            } else {
+                setAppData(DEFAULT_DATA);
+                window.FirebaseUtils.setDoc(docRef, DEFAULT_DATA).catch(console.error);
+            }
+        }, (error) => {
+            console.error("Error al sincronizar datos:", error);
+        });
+
+        return () => unsubscribe();
+      }, [user]);
+
+      // --- GESTOR CENTRAL DE ACTUALIZACIONES (GUARDA EN LA NUBE) ---
+      const updateData = useCallback((field, updater) => {
+          setAppData(prevData => {
+              if (!prevData) return prevData;
+              const currentVal = prevData[field];
+              const newVal = typeof updater === 'function' ? updater(currentVal) : updater;
+              const newData = { ...prevData, [field]: newVal };
+
+              const currentUser = userRef.current;
+              const hasConfig = typeof __firebase_config !== 'undefined' || EXTERNAL_FIREBASE_CONFIG;
+              
+              if (currentUser && window.FirebaseUtils && hasConfig) {
+                   const db = window.FirebaseUtils.getFirestore();
+                   const appId = typeof __app_id !== 'undefined' ? __app_id : 'adventure-app';
+                   const docRef = window.FirebaseUtils.doc(db, 'artifacts', appId, 'users', currentUser.uid, 'appData', 'main');
+                   window.FirebaseUtils.setDoc(docRef, newData, { merge: true }).catch(console.error);
+              }
+              return newData;
+          });
+      }, []);
+
+      // Pantalla de Carga
+      if (!appData) {
+          return (
+             <div className="min-h-screen bg-slate-900 flex items-center justify-center flex-col gap-4">
+                 <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                 <p className="text-emerald-500 font-medium tracking-wide">Sincronizando la Nube...</p>
+             </div>
+          );
+      }
+
+      // --- DISTRIBUCIÓN DEL ESTADO SINCRONIZADO ---
+      const habitsList = appData.habitsList;
+      const setHabitsList = (val) => updateData('habitsList', val);
+
+      const habitCompletions = appData.habitCompletions;
+      const setHabitCompletions = (val) => updateData('habitCompletions', val);
+
+      const finances = appData.finances;
+      const setFinances = (val) => updateData('finances', val);
+
+      const globalGoal = appData.globalGoal;
+      const setGlobalGoal = (val) => updateData('globalGoal', val);
+
+      const weeklyGoals = appData.weeklyGoals;
+      const setWeeklyGoals = (val) => updateData('weeklyGoals', val);
+
+      const healthLogs = appData.healthLogs;
+      const setHealthLogs = (val) => updateData('healthLogs', val);
+
+      const gymRoutine = appData.gymRoutine;
+      const setGymRoutine = (val) => updateData('gymRoutine', val);
+
+
+      // --- ESTADOS LOCALES (INTERFAZ DE USUARIO TEMPORAL) ---
+      const [selectedDate, setSelectedDate] = useState(getTodayString());
+      const [isEditingHabits, setIsEditingHabits] = useState(false);
+      const [newHabit, setNewHabit] = useState({ text: '', startTime: '', endTime: '', category: 'rutina' });
+      const [financeForm, setFinanceForm] = useState({ type: 'ingreso', amount: '', description: '' });
+      const [expandedDay, setExpandedDay] = useState('Lunes');
+      const [newTask, setNewTask] = useState({ text: '', time: '' });
+      const [healthForm, setHealthForm] = useState({ meal: '', symptoms: 'Ninguno', painLevel: 1 });
+
 
       // ================= LÓGICA AVANZADA DE HÁBITOS =================
       const currentCompletedIds = habitCompletions[selectedDate] || [];
@@ -205,7 +329,7 @@
         setNewHabit({ text: '', startTime: '', endTime: '', category: 'rutina' });
       };
 
-      // --- ANALÍTICAS DE HÁBITOS (Métricas reales) ---
+      // --- ANALÍTICAS DE HÁBITOS ---
       const habitAnalytics = useMemo(() => {
         const stats = {
           currentWeekScore: 0,
@@ -224,7 +348,6 @@
         const [year, month, day] = selectedDate.split('-').map(Number);
         const baseDate = new Date(year, month - 1, day);
 
-        // 1. Calcular Datos Históricos (30 días) para Mejores/Peores
         const habitCounts = {};
         habitsList.forEach(h => habitCounts[h.id] = 0);
 
@@ -246,7 +369,6 @@
           if (count < minCount) { minCount = count; stats.weakestHabit = h; }
         });
 
-        // 2. Calcular Score de las últimas 2 semanas y Cumplimiento por Categoría (7 días)
         let currentWeekHits = 0;
         let previousWeekHits = 0;
         
@@ -261,14 +383,12 @@
 
           if (i < 7) {
             currentWeekHits += hits;
-            // Para Histograma
             stats.trendData.unshift({
               date: dateStr,
               dayName: d.toLocaleDateString('es-ES', { weekday: 'short' }),
               percentage: Math.round((hits / totalHabits) * 100),
               isSelected: dateStr === selectedDate
             });
-            // Para Categorías
             habitsList.forEach(h => {
               if(stats.categoryCompliance[h.category]) {
                 stats.categoryCompliance[h.category].total++;
@@ -285,18 +405,15 @@
         stats.previousWeekScore = Math.round((previousWeekHits / possiblePerWeek) * 100);
         stats.trend = stats.currentWeekScore - stats.previousWeekScore;
 
-        // Convertir Categorías a porcentajes
         Object.keys(stats.categoryCompliance).forEach(c => {
           const cat = stats.categoryCompliance[c];
           cat.percentage = cat.total > 0 ? Math.round((cat.hits / cat.total) * 100) : 0;
         });
 
-        // 3. Calcular Rachas (Streaks) actuales
         habitsList.forEach(h => {
           let streak = 0;
           let checkDate = new Date(baseDate);
           
-          // Si no lo ha hecho hoy, empezamos a contar desde ayer (mantiene la racha viva si hoy aún hay tiempo)
           const todayCompleted = (habitCompletions[selectedDate] || []).includes(h.id);
           if (!todayCompleted) {
             checkDate.setDate(checkDate.getDate() - 1);
@@ -375,7 +492,6 @@
       const renderHabits = () => (
         <div className="space-y-6 animate-in">
           
-          {/* HEADER CONTROL */}
           <div className="flex flex-col sm:flex-row justify-between items-center bg-slate-800 p-4 rounded-2xl shadow-lg border border-slate-700 gap-4">
             <div className="flex items-center gap-3 w-full sm:w-auto">
               <CalendarDays className="text-emerald-500 w-6 h-6" />
@@ -395,7 +511,6 @@
             </button>
           </div>
 
-          {/* DASHBOARD DE METRICAS (4 Tarjetas) */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700 flex flex-col justify-between">
               <div className="flex justify-between items-start mb-2">
@@ -453,10 +568,7 @@
             </div>
           </div>
 
-          {/* ZONA PRINCIPAL: TABLA Y GRÁFICOS */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
-            {/* IZQUIERDA: Checklist / Edición (Ocupa 2/3 en Desktop) */}
             <div className="lg:col-span-2 bg-slate-800 rounded-2xl shadow-lg border border-slate-700 overflow-hidden flex flex-col">
               <h3 className="font-semibold text-white p-5 border-b border-slate-700 flex items-center gap-2 bg-slate-800/80">
                 <ListTodo className="w-5 h-5 text-emerald-500" />
@@ -465,7 +577,6 @@
 
               <div className="flex-1 overflow-x-auto">
                 {isEditingHabits ? (
-                  // MODO EDICIÓN EN TABLA
                   <div className="p-4 bg-slate-900/50 min-w-[650px]">
                     <table className="w-full text-left text-sm text-slate-300 mb-6">
                       <thead className="text-xs uppercase text-slate-400 border-b border-slate-700">
@@ -539,7 +650,6 @@
                     </div>
                   </div>
                 ) : (
-                  // MODO CHECKLIST LECTURA RAPIDA
                   habitsList.length === 0 ? (
                     <div className="p-8 text-center text-slate-500 text-sm">Activa "Gestionar Hábitos" para empezar.</div>
                   ) : (
@@ -587,10 +697,7 @@
               </div>
             </div>
 
-            {/* DERECHA: Analíticas y Gráficos (Ocupa 1/3 en Desktop) */}
             <div className="flex flex-col gap-6">
-              
-              {/* Desglose por Categoría (7 días) */}
               <div className="bg-slate-800 rounded-2xl shadow-lg border border-slate-700 p-5">
                 <h3 className="text-sm font-semibold text-white mb-4 uppercase tracking-wider">Cumplimiento por Área</h3>
                 <div className="space-y-4">
@@ -612,7 +719,6 @@
                 </div>
               </div>
 
-              {/* Histograma Semanal */}
               <div className="bg-slate-800 rounded-2xl shadow-lg border border-slate-700 p-5 flex flex-col flex-1 min-h-[220px]">
                 <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2 uppercase tracking-wider">
                   <BarChart className="w-4 h-4 text-blue-500" />
@@ -620,7 +726,6 @@
                 </h3>
                 
                 <div className="relative flex-1 flex items-end justify-between gap-1 mt-auto pt-6">
-                  {/* Líneas Base */}
                   <div className="absolute inset-0 flex flex-col justify-between pointer-events-none z-0">
                     {[100, 50, 0].map(val => (
                       <div key={val} className="flex items-center w-full border-b border-slate-700/30 h-0"></div>
@@ -650,7 +755,6 @@
         </div>
       );
 
-      // (Las funciones renderGoals, renderFinances, renderHealth, renderGym quedan igual y están funcionales)
       const renderGoals = () => (
         <div className="space-y-6 animate-in">
           <div className="bg-gradient-to-r from-blue-900 to-slate-800 p-6 rounded-2xl shadow-lg border border-blue-800">
