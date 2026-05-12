@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Adventure - Gestión Personal</title>
 
+  <!-- Etiquetas PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#10b981">
+  <link rel="apple-touch-icon" href="icon-192.png">
+
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
 
@@ -12,13 +17,13 @@
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
 
-  <!-- Babel para compilar JSX directamente en el navegador -->
+  <!-- Babel para compilar JSX -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <style>
     body {
-      background-color: #0f172a; /* bg-slate-900 */
-      color: #e2e8f0; /* text-slate-200 */
+      background-color: #0f172a;
+      color: #e2e8f0;
       margin: 0;
       font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     }
@@ -28,13 +33,10 @@
       from { opacity: 0; transform: translateY(10px); }
       to { opacity: 1; transform: translateY(0); }
     }
-    /* Estilos para el scrollbar para mantener un diseño limpio */
-    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
     ::-webkit-scrollbar-thumb:hover { background: #475569; }
-    
-    /* Estilo para los inputs de tipo time */
     input[type="time"]::-webkit-calendar-picker-indicator {
       filter: invert(1);
       cursor: pointer;
@@ -44,10 +46,18 @@
 <body>
   <div id="root"></div>
 
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW no registrado', err));
+      });
+    }
+  </script>
+
   <script type="text/babel">
     const { useState, useEffect, useMemo } = React;
 
-    // --- ICONOS COMPATIBLES (Reemplazando lucide-react) ---
+    // --- ICONOS COMPATIBLES ---
     const IconWrapper = ({ children, className = "", ...props }) => (
       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`lucide ${className}`} {...props}>
         {children}
@@ -71,16 +81,33 @@
     const ChevronUp = (p) => <IconWrapper {...p}><path d="m18 15-6-6-6 6"/></IconWrapper>;
     const Clock = (p) => <IconWrapper {...p}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></IconWrapper>;
     const BarChart = (p) => <IconWrapper {...p}><line x1="12" x2="12" y1="20" y2="10"/><line x1="18" x2="18" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="16"/></IconWrapper>;
+    
+    // Nuevos Iconos Analíticas
+    const Flame = (p) => <IconWrapper {...p}><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></IconWrapper>;
+    const Trophy = (p) => <IconWrapper {...p}><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></IconWrapper>;
+    const Zap = (p) => <IconWrapper {...p}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></IconWrapper>;
+    const AlertTriangle = (p) => <IconWrapper {...p}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></IconWrapper>;
+
+    // --- CONFIGURACIÓN DE CATEGORÍAS ---
+    const CATEGORIES = {
+      'salud': { label: 'Salud', color: 'text-rose-400', bg: 'bg-rose-500/20', bar: 'bg-rose-500' },
+      'alimentacion': { label: 'Alimentación', color: 'text-orange-400', bg: 'bg-orange-500/20', bar: 'bg-orange-500' },
+      'rutina': { label: 'Rutina', color: 'text-slate-300', bg: 'bg-slate-500/20', bar: 'bg-slate-400' },
+      'productividad': { label: 'Productividad', color: 'text-blue-400', bg: 'bg-blue-500/20', bar: 'bg-blue-500' },
+      'gym': { label: 'Gym', color: 'text-indigo-400', bg: 'bg-indigo-500/20', bar: 'bg-indigo-500' },
+      'desarrollo': { label: 'Desarrollo', color: 'text-purple-400', bg: 'bg-purple-500/20', bar: 'bg-purple-500' }
+    };
 
     // --- DATA INICIAL ---
     const INITIAL_HABITS_TEMPLATE = [
-      { id: 1, startTime: '06:30', endTime: '06:50', text: 'Despertarse y tomar agua' },
-      { id: 2, startTime: '06:45', endTime: '07:00', text: 'Estiramientos corporales' },
-      { id: 3, startTime: '07:00', endTime: '07:20', text: 'Desayunar' },
-      { id: 4, startTime: '07:20', endTime: '07:45', text: 'Bañarme y alistarme' },
-      { id: 5, startTime: '08:00', endTime: '08:30', text: 'Verificar asuntos' },
-      { id: 6, startTime: '08:30', endTime: '10:00', text: 'Trabajo enfocado' },
-      { id: 7, startTime: '17:00', endTime: '19:00', text: 'Rutina de entrenamiento (Gym)' },
+      { id: 1, startTime: '06:30', endTime: '06:50', text: 'Despertarse y tomar agua', category: 'salud' },
+      { id: 2, startTime: '06:45', endTime: '07:00', text: 'Estiramientos corporales', category: 'salud' },
+      { id: 3, startTime: '07:00', endTime: '07:20', text: 'Desayunar sano', category: 'alimentacion' },
+      { id: 4, startTime: '07:20', endTime: '07:45', text: 'Bañarme y alistarme', category: 'rutina' },
+      { id: 5, startTime: '08:00', endTime: '08:30', text: 'Planificar el día', category: 'productividad' },
+      { id: 6, startTime: '08:30', endTime: '10:00', text: 'Trabajo profundo', category: 'productividad' },
+      { id: 7, startTime: '17:00', endTime: '19:00', text: 'Rutina de pesas', category: 'gym' },
+      { id: 8, startTime: '21:00', endTime: '21:30', text: 'Leer 10 páginas', category: 'desarrollo' },
     ];
 
     const WEEK_DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
@@ -91,35 +118,30 @@
       'realizado': { label: 'Realizado', color: 'bg-emerald-900/40 text-emerald-400 border-emerald-700/50' }
     };
 
-    // Helper para obtener fecha actual en formato YYYY-MM-DD local
-    const getTodayString = () => {
-      const d = new Date();
+    const getLocalString = (d) => {
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     };
+    
+    const getTodayString = () => getLocalString(new Date());
 
     function App() {
       const [activeTab, setActiveTab] = useState('habits');
 
-      // --- ESTADOS: HÁBITOS ---
+      // --- ESTADOS ---
       const [habitsList, setHabitsList] = useState(INITIAL_HABITS_TEMPLATE);
-      const [habitCompletions, setHabitCompletions] = useState({}); // Formato: { 'YYYY-MM-DD': [id1, id2] }
+      const [habitCompletions, setHabitCompletions] = useState({}); 
       const [selectedDate, setSelectedDate] = useState(getTodayString());
       const [isEditingHabits, setIsEditingHabits] = useState(false);
-      const [newHabit, setNewHabit] = useState({ text: '', startTime: '', endTime: '' });
+      const [newHabit, setNewHabit] = useState({ text: '', startTime: '', endTime: '', category: 'rutina' });
 
-      // --- ESTADOS: FINANZAS ---
       const [finances, setFinances] = useState([]);
       const [financeForm, setFinanceForm] = useState({ type: 'ingreso', amount: '', description: '' });
       
-      // --- ESTADOS: METAS ---
       const [globalGoal, setGlobalGoal] = useState('Lanzar mi emprendimiento principal este mes');
       const [expandedDay, setExpandedDay] = useState('Lunes');
-      const [weeklyGoals, setWeeklyGoals] = useState(
-        WEEK_DAYS.map(day => ({ day, dailyGoal: '', tasks: [] }))
-      );
+      const [weeklyGoals, setWeeklyGoals] = useState(WEEK_DAYS.map(day => ({ day, dailyGoal: '', tasks: [] })));
       const [newTask, setNewTask] = useState({ text: '', time: '' });
 
-      // --- ESTADOS: SALUD Y GYM ---
       const [healthLogs, setHealthLogs] = useState([]);
       const [healthForm, setHealthForm] = useState({ meal: '', symptoms: 'Ninguno', painLevel: 1 });
       const [gymRoutine, setGymRoutine] = useState([
@@ -130,14 +152,13 @@
         { id: 5, day: 'Viernes', focus: 'Pierna (Femoral y Glúteo)', completed: false },
       ]);
 
-      // ================= LÓGICA DE HÁBITOS =================
+      // ================= LÓGICA AVANZADA DE HÁBITOS =================
       const currentCompletedIds = habitCompletions[selectedDate] || [];
 
       const toggleHabitCompletion = (id) => {
         setHabitCompletions(prev => {
           const dayCompletions = prev[selectedDate] || [];
           const isCompleted = dayCompletions.includes(id);
-          
           return {
             ...prev,
             [selectedDate]: isCompleted 
@@ -147,12 +168,6 @@
         });
       };
 
-      const dailyProgress = useMemo(() => {
-        if (habitsList.length === 0) return 0;
-        return Math.round((currentCompletedIds.length / habitsList.length) * 100);
-      }, [currentCompletedIds, habitsList]);
-
-      // Funciones de Edición de Hábitos
       const handleUpdateHabit = (id, field, value) => {
         setHabitsList(habitsList.map(h => h.id === id ? { ...h, [field]: value } : h));
       };
@@ -163,74 +178,147 @@
 
       const handleAddHabit = () => {
         if (!newHabit.text.trim()) return;
-        setHabitsList([...habitsList, { id: Date.now(), text: newHabit.text, startTime: newHabit.startTime, endTime: newHabit.endTime }]);
-        setNewHabit({ text: '', startTime: '', endTime: '' });
+        setHabitsList([...habitsList, { id: Date.now(), ...newHabit }]);
+        setNewHabit({ text: '', startTime: '', endTime: '', category: 'rutina' });
       };
 
-      // Cálculo para Gráfico de Tendencias (Últimos 7 días)
-      const trendData = useMemo(() => {
-        const data = [];
-        // Parsear la fecha seleccionada localmente para evitar desfases de zona horaria (ej: UTC-5)
+      // --- ANALÍTICAS DE HÁBITOS (Métricas reales) ---
+      const habitAnalytics = useMemo(() => {
+        const stats = {
+          currentWeekScore: 0,
+          previousWeekScore: 0,
+          trend: 0,
+          strongestHabit: null,
+          weakestHabit: null,
+          categoryCompliance: {},
+          streaks: {},
+          trendData: []
+        };
+
+        if (habitsList.length === 0) return stats;
+
+        const totalHabits = habitsList.length;
         const [year, month, day] = selectedDate.split('-').map(Number);
-        
-        for (let i = 6; i >= 0; i--) {
-          const d = new Date(year, month - 1, day);
-          d.setDate(d.getDate() - i); 
-          
-          const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-          
-          const dayCompletions = habitCompletions[dateStr] || [];
-          // El porcentaje se basa en el número de hábitos actuales para mantenerlo simple y dinámico
-          const percentage = habitsList.length > 0 ? Math.round((dayCompletions.length / habitsList.length) * 100) : 0;
-          
-          const isTodayStr = dateStr === selectedDate;
-          data.push({ 
-            date: dateStr, 
-            dayName: d.toLocaleDateString('es-ES', { weekday: 'short' }), 
-            percentage: percentage > 100 ? 100 : percentage, // Limitar a 100% si hay hábitos extras borrados
-            isSelected: isTodayStr 
+        const baseDate = new Date(year, month - 1, day);
+
+        // 1. Calcular Datos Históricos (30 días) para Mejores/Peores
+        const habitCounts = {};
+        habitsList.forEach(h => habitCounts[h.id] = 0);
+
+        for (let i = 0; i < 30; i++) {
+          const d = new Date(baseDate);
+          d.setDate(d.getDate() - i);
+          const dateStr = getLocalString(d);
+          const completedToday = habitCompletions[dateStr] || [];
+          completedToday.forEach(id => {
+            if(habitCounts[id] !== undefined) habitCounts[id]++;
           });
         }
-        return data;
-      }, [habitCompletions, habitsList.length, selectedDate]);
+
+        let maxCount = -1;
+        let minCount = 31;
+        habitsList.forEach(h => {
+          const count = habitCounts[h.id];
+          if (count > maxCount) { maxCount = count; stats.strongestHabit = h; }
+          if (count < minCount) { minCount = count; stats.weakestHabit = h; }
+        });
+
+        // 2. Calcular Score de las últimas 2 semanas y Cumplimiento por Categoría (7 días)
+        let currentWeekHits = 0;
+        let previousWeekHits = 0;
+        
+        Object.keys(CATEGORIES).forEach(c => stats.categoryCompliance[c] = { hits: 0, total: 0 });
+
+        for (let i = 0; i < 14; i++) {
+          const d = new Date(baseDate);
+          d.setDate(d.getDate() - i);
+          const dateStr = getLocalString(d);
+          const completedIds = habitCompletions[dateStr] || [];
+          const hits = completedIds.length;
+
+          if (i < 7) {
+            currentWeekHits += hits;
+            // Para Histograma
+            stats.trendData.unshift({
+              date: dateStr,
+              dayName: d.toLocaleDateString('es-ES', { weekday: 'short' }),
+              percentage: Math.round((hits / totalHabits) * 100),
+              isSelected: dateStr === selectedDate
+            });
+            // Para Categorías
+            habitsList.forEach(h => {
+              if(stats.categoryCompliance[h.category]) {
+                stats.categoryCompliance[h.category].total++;
+                if (completedIds.includes(h.id)) stats.categoryCompliance[h.category].hits++;
+              }
+            });
+          } else {
+            previousWeekHits += hits;
+          }
+        }
+
+        const possiblePerWeek = totalHabits * 7;
+        stats.currentWeekScore = Math.round((currentWeekHits / possiblePerWeek) * 100);
+        stats.previousWeekScore = Math.round((previousWeekHits / possiblePerWeek) * 100);
+        stats.trend = stats.currentWeekScore - stats.previousWeekScore;
+
+        // Convertir Categorías a porcentajes
+        Object.keys(stats.categoryCompliance).forEach(c => {
+          const cat = stats.categoryCompliance[c];
+          cat.percentage = cat.total > 0 ? Math.round((cat.hits / cat.total) * 100) : 0;
+        });
+
+        // 3. Calcular Rachas (Streaks) actuales
+        habitsList.forEach(h => {
+          let streak = 0;
+          let checkDate = new Date(baseDate);
+          
+          // Si no lo ha hecho hoy, empezamos a contar desde ayer (mantiene la racha viva si hoy aún hay tiempo)
+          const todayCompleted = (habitCompletions[selectedDate] || []).includes(h.id);
+          if (!todayCompleted) {
+            checkDate.setDate(checkDate.getDate() - 1);
+          }
+
+          while(true) {
+            const dateStr = getLocalString(checkDate);
+            if ((habitCompletions[dateStr] || []).includes(h.id)) {
+              streak++;
+              checkDate.setDate(checkDate.getDate() - 1);
+            } else {
+              break;
+            }
+          }
+          stats.streaks[h.id] = streak;
+        });
+
+        return stats;
+      }, [habitsList, habitCompletions, selectedDate]);
 
 
-      // ================= LÓGICA DE METAS (80/20) =================
+      // ================= LÓGICA DE METAS Y RESTO =================
       const addTaskToDay = (dayIndex) => {
         if (!newTask.text.trim()) return;
         const updatedGoals = [...weeklyGoals];
-        updatedGoals[dayIndex].tasks.push({ 
-          id: Date.now(), 
-          text: newTask.text, 
-          time: newTask.time,
-          status: 'sin_empezar', 
-          is8020: true 
-        });
+        updatedGoals[dayIndex].tasks.push({ id: Date.now(), text: newTask.text, time: newTask.time, status: 'sin_empezar', is8020: true });
         setWeeklyGoals(updatedGoals);
         setNewTask({ text: '', time: '' });
       };
-
       const updateTaskStatus = (dayIndex, taskId, newStatus) => {
         const updatedGoals = [...weeklyGoals];
-        updatedGoals[dayIndex].tasks = updatedGoals[dayIndex].tasks.map(t => 
-          t.id === taskId ? { ...t, status: newStatus } : t
-        );
+        updatedGoals[dayIndex].tasks = updatedGoals[dayIndex].tasks.map(t => t.id === taskId ? { ...t, status: newStatus } : t);
         setWeeklyGoals(updatedGoals);
       };
-
       const deleteTask = (dayIndex, taskId) => {
         const updatedGoals = [...weeklyGoals];
         updatedGoals[dayIndex].tasks = updatedGoals[dayIndex].tasks.filter(t => t.id !== taskId);
         setWeeklyGoals(updatedGoals);
       };
-
       const updateDailyGoal = (dayIndex, text) => {
         const updatedGoals = [...weeklyGoals];
         updatedGoals[dayIndex].dailyGoal = text;
         setWeeklyGoals(updatedGoals);
       };
 
-      // ================= OTRAS FUNCIONES =================
       const addTransaction = (e) => {
         e.preventDefault();
         if (!financeForm.amount || !financeForm.description) return;
@@ -239,8 +327,7 @@
       };
       const financeTotals = useMemo(() => {
         return finances.reduce((acc, curr) => {
-          if (curr.type === 'ingreso') acc.income += curr.amount;
-          else acc.expense += curr.amount;
+          if (curr.type === 'ingreso') acc.income += curr.amount; else acc.expense += curr.amount;
           return acc;
         }, { income: 0, expense: 0 });
       }, [finances]);
@@ -261,35 +348,11 @@
       }, [gymRoutine]);
 
 
-      // ================= COMPONENTES UI =================
-      const CircularProgressBar = ({ percentage }) => {
-        const radius = 45;
-        const circumference = 2 * Math.PI * radius;
-        const offset = circumference - (percentage / 100) * circumference;
-
-        return (
-          <div className="relative flex items-center justify-center w-36 h-36 md:w-40 md:h-40">
-            <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-              <circle className="text-slate-700 stroke-current" strokeWidth="8" cx="50" cy="50" r={radius} fill="transparent" />
-              <circle
-                className="text-emerald-500 stroke-current transition-all duration-1000 ease-in-out"
-                strokeWidth="8" strokeLinecap="round" cx="50" cy="50" r={radius} fill="transparent"
-                strokeDasharray={circumference} strokeDashoffset={offset}
-              />
-            </svg>
-            <div className="absolute flex flex-col items-center justify-center text-white">
-              <span className="text-3xl font-bold">{percentage}%</span>
-              <span className="text-[10px] uppercase tracking-wider text-slate-400">Progreso</span>
-            </div>
-          </div>
-        );
-      };
-
       // ================= RENDERIZADO DE PESTAÑAS =================
       const renderHabits = () => (
         <div className="space-y-6 animate-in">
           
-          {/* Controles Superiores: Fecha y Ajustes */}
+          {/* HEADER CONTROL */}
           <div className="flex flex-col sm:flex-row justify-between items-center bg-slate-800 p-4 rounded-2xl shadow-lg border border-slate-700 gap-4">
             <div className="flex items-center gap-3 w-full sm:w-auto">
               <CalendarDays className="text-emerald-500 w-6 h-6" />
@@ -297,7 +360,7 @@
                 type="date" 
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="bg-slate-900 border border-slate-600 rounded-lg p-2 text-white outline-none focus:border-emerald-500 w-full sm:w-auto"
+                className="bg-slate-900 border border-slate-600 rounded-lg p-2 text-white outline-none focus:border-emerald-500 w-full sm:w-auto font-medium"
               />
             </div>
             <button 
@@ -309,54 +372,114 @@
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Panel de Progreso y Checklist Estructurado en Tabla */}
-            <div className="bg-slate-800 rounded-2xl shadow-lg border border-slate-700 overflow-hidden flex flex-col">
-              <div className="p-6 border-b border-slate-700 flex flex-col items-center bg-slate-800/50">
-                <h3 className="font-semibold text-white flex items-center gap-2 mb-4 w-full justify-center">
-                  <ListTodo className="w-5 h-5 text-emerald-500" />
-                  Estado del Día Seleccionado
-                </h3>
-                <CircularProgressBar percentage={dailyProgress} />
+          {/* DASHBOARD DE METRICAS (4 Tarjetas) */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700 flex flex-col justify-between">
+              <div className="flex justify-between items-start mb-2">
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Score Bienestar</span>
+                <Zap className={`w-5 h-5 ${habitAnalytics.currentWeekScore >= 70 ? 'text-yellow-400' : 'text-slate-500'}`} />
               </div>
+              <div className="flex items-end gap-2">
+                <span className="text-3xl font-bold text-white">{habitAnalytics.currentWeekScore}%</span>
+                <span className={`text-xs font-medium mb-1 ${habitAnalytics.trend >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {habitAnalytics.trend >= 0 ? '+' : ''}{habitAnalytics.trend}% vs sem ant.
+                </span>
+              </div>
+            </div>
 
-              <div className="flex-1 overflow-x-auto max-h-[500px]">
+            <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700 flex flex-col justify-between">
+              <div className="flex justify-between items-start mb-2">
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Hábito Fuerte</span>
+                <Trophy className="w-5 h-5 text-emerald-400" />
+              </div>
+              <div>
+                <span className="text-sm font-bold text-white leading-tight block truncate">
+                  {habitAnalytics.strongestHabit ? habitAnalytics.strongestHabit.text : '---'}
+                </span>
+                <span className="text-xs text-slate-500">Últimos 30 días</span>
+              </div>
+            </div>
+
+            <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700 flex flex-col justify-between">
+              <div className="flex justify-between items-start mb-2">
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Por Mejorar</span>
+                <AlertTriangle className="w-5 h-5 text-orange-400" />
+              </div>
+              <div>
+                <span className="text-sm font-bold text-white leading-tight block truncate">
+                  {habitAnalytics.weakestHabit ? habitAnalytics.weakestHabit.text : '---'}
+                </span>
+                <span className="text-xs text-slate-500">Últimos 30 días</span>
+              </div>
+            </div>
+
+            <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700 flex flex-col justify-between">
+              <div className="flex justify-between items-start mb-2">
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Progreso Hoy</span>
+                <Target className="w-5 h-5 text-blue-400" />
+              </div>
+              <div className="w-full bg-slate-900 rounded-full h-2.5 mb-1 mt-2">
+                <div 
+                  className="bg-blue-500 h-2.5 rounded-full transition-all duration-1000"
+                  style={{ width: `${habitsList.length > 0 ? (currentCompletedIds.length / habitsList.length) * 100 : 0}%` }}
+                ></div>
+              </div>
+              <span className="text-xs font-medium text-white text-right">
+                {currentCompletedIds.length} / {habitsList.length} completados
+              </span>
+            </div>
+          </div>
+
+          {/* ZONA PRINCIPAL: TABLA Y GRÁFICOS */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            {/* IZQUIERDA: Checklist / Edición (Ocupa 2/3 en Desktop) */}
+            <div className="lg:col-span-2 bg-slate-800 rounded-2xl shadow-lg border border-slate-700 overflow-hidden flex flex-col">
+              <h3 className="font-semibold text-white p-5 border-b border-slate-700 flex items-center gap-2 bg-slate-800/80">
+                <ListTodo className="w-5 h-5 text-emerald-500" />
+                {isEditingHabits ? 'Configuración de Hábitos' : 'Lista de Hoy'}
+              </h3>
+
+              <div className="flex-1 overflow-x-auto">
                 {isEditingHabits ? (
                   // MODO EDICIÓN EN TABLA
-                  <div className="p-4 bg-slate-900/50 min-w-[500px]">
+                  <div className="p-4 bg-slate-900/50 min-w-[650px]">
                     <table className="w-full text-left text-sm text-slate-300 mb-6">
                       <thead className="text-xs uppercase text-slate-400 border-b border-slate-700">
                         <tr>
-                          <th className="pb-3 pr-2">Hábito</th>
-                          <th className="pb-3 px-2 w-28">Hora Inicio</th>
-                          <th className="pb-3 px-2 w-28">Hora Fin</th>
-                          <th className="pb-3 pl-2 w-12 text-center">X</th>
+                          <th className="pb-3 px-2">Hábito</th>
+                          <th className="pb-3 px-2 w-32">Categoría</th>
+                          <th className="pb-3 px-2 w-24">Inicio</th>
+                          <th className="pb-3 px-2 w-24">Fin</th>
+                          <th className="pb-3 pl-2 w-10 text-center"></th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-800">
                         {habitsList.map((habit) => (
                           <tr key={habit.id}>
-                            <td className="py-2 pr-2">
+                            <td className="py-2 px-2">
                               <input 
-                                value={habit.text} 
-                                onChange={(e) => handleUpdateHabit(habit.id, 'text', e.target.value)}
-                                placeholder="Nombre del hábito"
+                                value={habit.text} onChange={(e) => handleUpdateHabit(habit.id, 'text', e.target.value)}
                                 className="bg-slate-900 text-sm text-white border border-slate-600 rounded p-2 outline-none focus:border-emerald-500 w-full"
                               />
                             </td>
                             <td className="py-2 px-2">
+                              <select 
+                                value={habit.category || 'rutina'} onChange={(e) => handleUpdateHabit(habit.id, 'category', e.target.value)}
+                                className="bg-slate-900 text-xs text-white border border-slate-600 rounded p-2 outline-none focus:border-emerald-500 w-full"
+                              >
+                                {Object.entries(CATEGORIES).map(([key, cat]) => <option key={key} value={key}>{cat.label}</option>)}
+                              </select>
+                            </td>
+                            <td className="py-2 px-2">
                               <input 
-                                type="time"
-                                value={habit.startTime} 
-                                onChange={(e) => handleUpdateHabit(habit.id, 'startTime', e.target.value)}
+                                type="time" value={habit.startTime} onChange={(e) => handleUpdateHabit(habit.id, 'startTime', e.target.value)}
                                 className="bg-slate-900 text-xs text-emerald-400 border border-slate-600 rounded p-2 outline-none focus:border-emerald-500 w-full"
                               />
                             </td>
                             <td className="py-2 px-2">
                               <input 
-                                type="time"
-                                value={habit.endTime} 
-                                onChange={(e) => handleUpdateHabit(habit.id, 'endTime', e.target.value)}
+                                type="time" value={habit.endTime} onChange={(e) => handleUpdateHabit(habit.id, 'endTime', e.target.value)}
                                 className="bg-slate-900 text-xs text-emerald-400 border border-slate-600 rounded p-2 outline-none focus:border-emerald-500 w-full"
                               />
                             </td>
@@ -370,71 +493,66 @@
                       </tbody>
                     </table>
                     
-                    {/* Agregar Nuevo */}
                     <div className="border-t border-slate-700 pt-4">
-                      <h4 className="text-sm font-semibold text-emerald-400 mb-3 flex items-center gap-1"><Plus className="w-4 h-4" /> Agregar Nuevo Hábito</h4>
+                      <h4 className="text-sm font-semibold text-emerald-400 mb-3 flex items-center gap-1"><Plus className="w-4 h-4" /> Agregar Nuevo</h4>
                       <div className="flex gap-2">
                         <input 
-                          value={newHabit.text} 
-                          onChange={(e) => setNewHabit({...newHabit, text: e.target.value})}
-                          placeholder="Descripción del nuevo hábito"
-                          onKeyPress={(e) => e.key === 'Enter' && handleAddHabit()}
+                          value={newHabit.text} onChange={(e) => setNewHabit({...newHabit, text: e.target.value})}
+                          placeholder="Descripción..." onKeyPress={(e) => e.key === 'Enter' && handleAddHabit()}
                           className="bg-slate-900 text-sm text-white border border-slate-600 rounded p-2 outline-none flex-1 focus:border-emerald-500"
                         />
+                        <select 
+                          value={newHabit.category} onChange={(e) => setNewHabit({...newHabit, category: e.target.value})}
+                          className="bg-slate-900 text-xs text-white border border-slate-600 rounded p-2 outline-none focus:border-emerald-500"
+                        >
+                          {Object.entries(CATEGORIES).map(([key, cat]) => <option key={key} value={key}>{cat.label}</option>)}
+                        </select>
                         <input 
-                          type="time"
-                          value={newHabit.startTime} 
-                          onChange={(e) => setNewHabit({...newHabit, startTime: e.target.value})}
-                          className="bg-slate-900 text-xs text-white border border-slate-600 rounded p-2 outline-none w-28 focus:border-emerald-500"
+                          type="time" value={newHabit.startTime} onChange={(e) => setNewHabit({...newHabit, startTime: e.target.value})}
+                          className="bg-slate-900 text-xs text-white border border-slate-600 rounded p-2 outline-none w-24 focus:border-emerald-500"
                         />
-                        <input 
-                          type="time"
-                          value={newHabit.endTime} 
-                          onChange={(e) => setNewHabit({...newHabit, endTime: e.target.value})}
-                          className="bg-slate-900 text-xs text-white border border-slate-600 rounded p-2 outline-none w-28 focus:border-emerald-500"
-                        />
-                        <button onClick={handleAddHabit} className="bg-emerald-600 text-white px-3 py-2 rounded hover:bg-emerald-500 flex justify-center items-center">
-                          Añadir
-                        </button>
+                        <button onClick={handleAddHabit} className="bg-emerald-600 text-white px-3 py-2 rounded hover:bg-emerald-500 font-medium">Añadir</button>
                       </div>
                     </div>
                   </div>
                 ) : (
-                  // MODO CHECKLIST EN TABLA
+                  // MODO CHECKLIST LECTURA RAPIDA
                   habitsList.length === 0 ? (
-                    <div className="p-8 text-center text-slate-500 text-sm">No hay hábitos. Activa "Gestionar Hábitos" para agregar.</div>
+                    <div className="p-8 text-center text-slate-500 text-sm">Activa "Gestionar Hábitos" para empezar.</div>
                   ) : (
-                    <table className="w-full text-left text-sm text-slate-300 min-w-[450px]">
-                      <thead className="bg-slate-800/80 text-xs uppercase text-slate-400 border-b border-slate-700">
-                        <tr>
-                          <th className="px-4 py-3 font-semibold text-center w-16">Estado</th>
-                          <th className="px-4 py-3 font-semibold">Hábito</th>
-                          <th className="px-4 py-3 font-semibold w-24">Inicio</th>
-                          <th className="px-4 py-3 font-semibold w-24">Fin</th>
-                        </tr>
-                      </thead>
+                    <table className="w-full text-left text-sm text-slate-300 min-w-[500px]">
                       <tbody className="divide-y divide-slate-700/50">
                         {habitsList.map((habit) => {
                           const isCompleted = currentCompletedIds.includes(habit.id);
+                          const cat = CATEGORIES[habit.category || 'rutina'];
+                          const streak = habitAnalytics.streaks[habit.id] || 0;
+
                           return (
-                            <tr key={habit.id} className="hover:bg-slate-700/30 transition-colors">
-                              <td className="px-4 py-3 text-center">
+                            <tr key={habit.id} className="hover:bg-slate-700/30 transition-colors group">
+                              <td className="px-4 py-3 text-center w-12">
                                 <button onClick={() => toggleHabitCompletion(habit.id)} className="focus:outline-none translate-y-[2px]">
-                                  {isCompleted ? <CheckCircle2 className="w-6 h-6 text-emerald-500 mx-auto" /> : <Circle className="w-6 h-6 text-slate-500 mx-auto" />}
+                                  {isCompleted ? <CheckCircle2 className="w-6 h-6 text-emerald-500 mx-auto transition-transform scale-110" /> : <Circle className="w-6 h-6 text-slate-500 mx-auto hover:text-slate-400" />}
                                 </button>
                               </td>
-                              <td className={`px-4 py-3 font-medium transition-colors ${isCompleted ? 'text-slate-500 line-through' : 'text-slate-200'}`}>
-                                {habit.text}
-                              </td>
-                              <td className="px-4 py-3 text-xs text-emerald-400/80 whitespace-nowrap">
-                                <div className="flex items-center gap-1">
-                                  <Clock className="w-3 h-3" /> {habit.startTime || '--:--'}
+                              <td className="px-2 py-3">
+                                <div className="flex items-center gap-2">
+                                  <span className={`font-medium transition-colors ${isCompleted ? 'text-slate-500 line-through' : 'text-slate-100'}`}>
+                                    {habit.text}
+                                  </span>
+                                  {streak >= 3 && (
+                                    <span className="flex items-center gap-0.5 text-xs font-bold text-orange-500 bg-orange-500/10 px-1.5 py-0.5 rounded" title="Racha actual">
+                                      <Flame className="w-3 h-3" /> {streak}
+                                    </span>
+                                  )}
                                 </div>
                               </td>
-                              <td className="px-4 py-3 text-xs text-emerald-400/80 whitespace-nowrap">
-                                <div className="flex items-center gap-1">
-                                  <Clock className="w-3 h-3" /> {habit.endTime || '--:--'}
-                                </div>
+                              <td className="px-2 py-3 w-32">
+                                <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-1 rounded-full ${cat.bg} ${cat.color}`}>
+                                  {cat.label}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap text-right w-32">
+                                {habit.startTime || '--:--'} <span className="opacity-50 mx-1">-</span> {habit.endTime || '--:--'}
                               </td>
                             </tr>
                           );
@@ -446,59 +564,70 @@
               </div>
             </div>
 
-            {/* Panel Gráfico de Tendencia (Histograma de Barras) */}
-            <div className="bg-slate-800 rounded-2xl shadow-lg border border-slate-700 p-6 flex flex-col">
-              <h3 className="font-semibold text-white flex items-center gap-2 mb-6 border-b border-slate-700 pb-4">
-                <BarChart className="w-5 h-5 text-blue-500" />
-                Comparación Semanal (Progreso %)
-              </h3>
+            {/* DERECHA: Analíticas y Gráficos (Ocupa 1/3 en Desktop) */}
+            <div className="flex flex-col gap-6">
               
-              <div className="relative flex-1 flex items-end justify-between gap-3 h-56 mt-auto pb-6 pl-8 pr-2">
-                {/* Líneas de cuadrícula del Eje Y */}
-                <div className="absolute inset-0 flex flex-col justify-between pb-6 pl-6 pointer-events-none z-0">
-                  {[100, 75, 50, 25, 0].map(val => (
-                    <div key={val} className="flex items-center w-full border-b border-slate-700/50 h-0 relative">
-                      <span className="text-[10px] text-slate-400 absolute -left-8 transform -translate-y-1/2 bg-slate-800 px-1 w-7 text-right">
-                        {val}%
+              {/* Desglose por Categoría (7 días) */}
+              <div className="bg-slate-800 rounded-2xl shadow-lg border border-slate-700 p-5">
+                <h3 className="text-sm font-semibold text-white mb-4 uppercase tracking-wider">Cumplimiento por Área</h3>
+                <div className="space-y-4">
+                  {Object.entries(CATEGORIES).map(([key, cat]) => {
+                    const stats = habitAnalytics.categoryCompliance[key];
+                    if (!stats || stats.total === 0) return null;
+                    return (
+                      <div key={key}>
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className={`${cat.color} font-medium`}>{cat.label}</span>
+                          <span className="text-slate-400">{stats.percentage}%</span>
+                        </div>
+                        <div className="w-full bg-slate-900 rounded-full h-1.5">
+                          <div className={`h-1.5 rounded-full ${cat.bar} transition-all duration-700`} style={{ width: `${stats.percentage}%` }}></div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Histograma Semanal */}
+              <div className="bg-slate-800 rounded-2xl shadow-lg border border-slate-700 p-5 flex flex-col flex-1 min-h-[220px]">
+                <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2 uppercase tracking-wider">
+                  <BarChart className="w-4 h-4 text-blue-500" />
+                  Semana Actual
+                </h3>
+                
+                <div className="relative flex-1 flex items-end justify-between gap-1 mt-auto pt-6">
+                  {/* Líneas Base */}
+                  <div className="absolute inset-0 flex flex-col justify-between pointer-events-none z-0">
+                    {[100, 50, 0].map(val => (
+                      <div key={val} className="flex items-center w-full border-b border-slate-700/30 h-0"></div>
+                    ))}
+                  </div>
+
+                  {habitAnalytics.trendData.map((data, i) => (
+                    <div key={i} className="flex flex-col items-center w-full group relative z-10 h-full justify-end">
+                      <span className="text-[10px] font-bold text-white mb-1 opacity-0 group-hover:opacity-100 transition-opacity absolute -top-5 bg-slate-900 px-1 py-0.5 rounded z-20">
+                        {data.percentage}%
+                      </span>
+                      <div 
+                        className={`w-full max-w-[1.5rem] rounded-t-sm transition-all duration-700 relative ${
+                          data.isSelected ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]' : 'bg-slate-600 hover:bg-slate-500'
+                        }`} 
+                        style={{ height: `${data.percentage}%`, minHeight: data.percentage > 0 ? '4px' : '2px' }}
+                      ></div>
+                      <span className={`text-[9px] mt-2 uppercase tracking-widest ${data.isSelected ? 'text-emerald-400 font-bold' : 'text-slate-500'}`}>
+                        {data.dayName.charAt(0)}
                       </span>
                     </div>
                   ))}
                 </div>
-
-                {/* Barras del Histograma */}
-                {trendData.map((data, i) => (
-                  <div key={i} className="flex flex-col items-center w-full group relative z-10 h-full justify-end">
-                    <span className="text-[10px] font-bold text-slate-200 mb-1 opacity-0 group-hover:opacity-100 transition-opacity absolute -top-5 bg-slate-900 px-2 py-0.5 rounded border border-slate-700">
-                      {data.percentage}%
-                    </span>
-                    <div 
-                      className={`w-full max-w-[2.5rem] rounded-t-md transition-all duration-700 ease-out relative ${
-                        data.isSelected 
-                          ? 'bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.25)]' 
-                          : 'bg-blue-600/60 hover:bg-blue-500'
-                      }`} 
-                      style={{ 
-                        height: `${data.percentage}%`, 
-                        minHeight: data.percentage > 0 ? '4px' : '2px' 
-                      }}
-                    >
-                    </div>
-                    <span className={`text-[10px] absolute -bottom-6 uppercase tracking-wider ${
-                      data.isSelected ? 'text-emerald-400 font-bold' : 'text-slate-400'
-                    }`}>
-                      {data.dayName}
-                    </span>
-                  </div>
-                ))}
               </div>
-              <p className="text-xs text-slate-500 text-center mt-8">
-                Histórico de cumplimiento relativo a los 7 días previos a: <strong className="text-slate-400">{selectedDate}</strong>.
-              </p>
             </div>
           </div>
         </div>
       );
 
+      // (Las funciones renderGoals, renderFinances, renderHealth, renderGym quedan igual y están funcionales)
       const renderGoals = () => (
         <div className="space-y-6 animate-in">
           <div className="bg-gradient-to-r from-blue-900 to-slate-800 p-6 rounded-2xl shadow-lg border border-blue-800">
@@ -518,109 +647,48 @@
           <div className="space-y-3">
             {weeklyGoals.map((dayPlan, index) => {
               const isExpanded = expandedDay === dayPlan.day;
-              
               return (
                 <div key={dayPlan.day} className={`bg-slate-800 rounded-xl border transition-all duration-300 overflow-hidden ${isExpanded ? 'border-emerald-500/50 shadow-lg' : 'border-slate-700 hover:border-slate-600'}`}>
-                  
-                  {/* Acordeón Header */}
-                  <button 
-                    onClick={() => setExpandedDay(isExpanded ? null : dayPlan.day)}
-                    className="w-full flex items-center justify-between p-4 bg-slate-800/80 focus:outline-none"
-                  >
+                  <button onClick={() => setExpandedDay(isExpanded ? null : dayPlan.day)} className="w-full flex items-center justify-between p-4 bg-slate-800/80 focus:outline-none">
                     <div className="flex items-center gap-3">
-                      <h3 className={`font-bold text-lg ${isExpanded ? 'text-emerald-400' : 'text-slate-200'}`}>
-                        {dayPlan.day}
-                      </h3>
-                      {!isExpanded && dayPlan.tasks.length > 0 && (
-                        <span className="text-xs bg-slate-700 text-slate-300 px-2 py-1 rounded-full">
-                          {dayPlan.tasks.length} tareas
-                        </span>
-                      )}
+                      <h3 className={`font-bold text-lg ${isExpanded ? 'text-emerald-400' : 'text-slate-200'}`}>{dayPlan.day}</h3>
+                      {!isExpanded && dayPlan.tasks.length > 0 && <span className="text-xs bg-slate-700 text-slate-300 px-2 py-1 rounded-full">{dayPlan.tasks.length} tareas</span>}
                     </div>
                     {isExpanded ? <ChevronUp className="text-slate-400" /> : <ChevronDown className="text-slate-400" />}
                   </button>
-
-                  {/* Acordeón Body */}
                   {isExpanded && (
                     <div className="p-4 border-t border-slate-700/50 bg-slate-900/30">
                       <div className="mb-6">
                         <label className="text-xs font-semibold text-slate-400 uppercase mb-1 block">Meta General del Día</label>
-                        <input 
-                          type="text" 
-                          placeholder="Ej: Terminar módulo 1 del curso..." 
-                          value={dayPlan.dailyGoal}
-                          onChange={(e) => updateDailyGoal(index, e.target.value)}
-                          className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-sm text-white focus:border-emerald-500 focus:outline-none"
-                        />
+                        <input type="text" placeholder="Ej: Terminar módulo 1 del curso..." value={dayPlan.dailyGoal} onChange={(e) => updateDailyGoal(index, e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-sm text-white focus:border-emerald-500 focus:outline-none" />
                       </div>
-                      
-                      {/* Lista de Tareas */}
                       <div className="space-y-3 mb-6">
                         <label className="text-xs font-semibold text-slate-400 uppercase block">Actividades Clave (20%)</label>
-                        {dayPlan.tasks.length === 0 ? (
-                          <p className="text-sm text-slate-500 italic">No hay actividades registradas aún.</p>
-                        ) : (
-                          dayPlan.tasks.map(task => (
+                        {dayPlan.tasks.length === 0 ? <p className="text-sm text-slate-500 italic">No hay actividades registradas aún.</p> : dayPlan.tasks.map(task => (
                             <div key={task.id} className={`flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-lg border ${STATUS_CONFIG[task.status].color}`}>
                               <div className="flex-1">
-                                <span className="text-sm font-medium flex items-center gap-2">
-                                  <span className="text-[10px] bg-black/20 px-1.5 py-0.5 rounded font-bold uppercase">20%</span>
-                                  {task.text}
-                                </span>
-                                {task.time && (
-                                  <span className="text-xs mt-1 flex items-center gap-1 opacity-80">
-                                    <Clock className="w-3 h-3" /> {task.time}
-                                  </span>
-                                )}
+                                <span className="text-sm font-medium flex items-center gap-2"><span className="text-[10px] bg-black/20 px-1.5 py-0.5 rounded font-bold uppercase">20%</span>{task.text}</span>
+                                {task.time && <span className="text-xs mt-1 flex items-center gap-1 opacity-80"><Clock className="w-3 h-3" /> {task.time}</span>}
                               </div>
-                              
                               <div className="flex items-center gap-2 mt-2 sm:mt-0">
-                                <select 
-                                  value={task.status}
-                                  onChange={(e) => updateTaskStatus(index, task.id, e.target.value)}
-                                  className="text-xs bg-black/20 border border-transparent rounded p-1.5 outline-none cursor-pointer hover:border-white/20 font-medium"
-                                >
+                                <select value={task.status} onChange={(e) => updateTaskStatus(index, task.id, e.target.value)} className="text-xs bg-black/20 border border-transparent rounded p-1.5 outline-none cursor-pointer hover:border-white/20 font-medium">
                                   <option value="sin_empezar" className="bg-slate-800 text-white">Sin empezar</option>
                                   <option value="en_curso" className="bg-slate-800 text-white">En curso</option>
                                   <option value="realizado" className="bg-slate-800 text-white">Realizado</option>
                                 </select>
-                                <button onClick={() => deleteTask(index, task.id)} className="p-1.5 hover:bg-black/20 rounded transition-colors text-inherit opacity-70 hover:opacity-100">
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
+                                <button onClick={() => deleteTask(index, task.id)} className="p-1.5 hover:bg-black/20 rounded transition-colors text-inherit opacity-70 hover:opacity-100"><Trash2 className="w-4 h-4" /></button>
                               </div>
                             </div>
-                          ))
-                        )}
+                          ))}
                       </div>
-
-                      {/* Formulario Nueva Tarea */}
                       <div className="bg-slate-800 p-3 rounded-lg border border-slate-700">
                         <h4 className="text-xs font-semibold text-emerald-400 mb-2 flex items-center gap-1"><Plus className="w-3 h-3"/> Agregar Actividad</h4>
                         <div className="flex flex-col sm:flex-row gap-2">
-                          <input 
-                            type="text" 
-                            placeholder="Horario (Ej. 10:00am - 12:00pm)" 
-                            value={newTask.time}
-                            onChange={(e) => setNewTask({...newTask, time: e.target.value})}
-                            className="bg-slate-900 border border-slate-600 rounded p-2 text-xs text-white focus:border-emerald-500 outline-none sm:w-1/3"
-                          />
-                          <input 
-                            type="text" 
-                            placeholder="Describe la actividad clave..." 
-                            value={newTask.text}
-                            onChange={(e) => setNewTask({...newTask, text: e.target.value})}
-                            onKeyPress={(e) => e.key === 'Enter' && addTaskToDay(index)}
-                            className="flex-1 bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white focus:border-emerald-500 outline-none"
-                          />
-                          <button 
-                            onClick={() => addTaskToDay(index)}
-                            className="bg-emerald-600 hover:bg-emerald-500 text-white p-2 rounded transition-colors font-medium text-sm flex justify-center items-center gap-1"
-                          >
-                            Añadir
-                          </button>
+                          <input type="text" placeholder="Horario (Ej. 10:00am - 12:00pm)" value={newTask.time} onChange={(e) => setNewTask({...newTask, time: e.target.value})} className="bg-slate-900 border border-slate-600 rounded p-2 text-xs text-white focus:border-emerald-500 outline-none sm:w-1/3" />
+                          <input type="text" placeholder="Describe la actividad clave..." value={newTask.text} onChange={(e) => setNewTask({...newTask, text: e.target.value})} onKeyPress={(e) => e.key === 'Enter' && addTaskToDay(index)} className="flex-1 bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white focus:border-emerald-500 outline-none" />
+                          <button onClick={() => addTaskToDay(index)} className="bg-emerald-600 hover:bg-emerald-500 text-white p-2 rounded transition-colors font-medium text-sm flex justify-center items-center gap-1">Añadir</button>
                         </div>
                       </div>
-
                     </div>
                   )}
                 </div>
@@ -634,76 +702,38 @@
         <div className="space-y-6 animate-in">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700">
-              <div className="flex items-center gap-2 text-emerald-400 mb-2">
-                <TrendingUp className="w-5 h-5" /> <span className="font-semibold text-sm">Ingresos</span>
-              </div>
+              <div className="flex items-center gap-2 text-emerald-400 mb-2"><TrendingUp className="w-5 h-5" /> <span className="font-semibold text-sm">Ingresos</span></div>
               <p className="text-2xl font-bold text-white">${financeTotals.income.toLocaleString()}</p>
             </div>
             <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700">
-              <div className="flex items-center gap-2 text-red-400 mb-2">
-                <TrendingDown className="w-5 h-5" /> <span className="font-semibold text-sm">Egresos</span>
-              </div>
+              <div className="flex items-center gap-2 text-red-400 mb-2"><TrendingDown className="w-5 h-5" /> <span className="font-semibold text-sm">Egresos</span></div>
               <p className="text-2xl font-bold text-white">${financeTotals.expense.toLocaleString()}</p>
             </div>
             <div className="col-span-2 md:col-span-1 bg-slate-800 p-4 rounded-2xl border border-slate-700">
-              <div className="flex items-center gap-2 text-blue-400 mb-2">
-                <DollarSign className="w-5 h-5" /> <span className="font-semibold text-sm">Balance</span>
-              </div>
-              <p className={`text-2xl font-bold ${financeTotals.income - financeTotals.expense >= 0 ? 'text-white' : 'text-red-400'}`}>
-                ${(financeTotals.income - financeTotals.expense).toLocaleString()}
-              </p>
+              <div className="flex items-center gap-2 text-blue-400 mb-2"><DollarSign className="w-5 h-5" /> <span className="font-semibold text-sm">Balance</span></div>
+              <p className={`text-2xl font-bold ${financeTotals.income - financeTotals.expense >= 0 ? 'text-white' : 'text-red-400'}`}>${(financeTotals.income - financeTotals.expense).toLocaleString()}</p>
             </div>
           </div>
-
           <div className="bg-slate-800 p-5 rounded-2xl border border-slate-700">
             <h3 className="font-bold text-white mb-4">Registrar Movimiento</h3>
             <form onSubmit={addTransaction} className="flex flex-col md:flex-row gap-4">
-              <select 
-                value={financeForm.type}
-                onChange={(e) => setFinanceForm({...financeForm, type: e.target.value})}
-                className="bg-slate-900 text-white border border-slate-700 rounded-lg p-3 outline-none focus:border-emerald-500"
-              >
-                <option value="ingreso">Ingreso (+)</option>
-                <option value="egreso">Egreso (-)</option>
+              <select value={financeForm.type} onChange={(e) => setFinanceForm({...financeForm, type: e.target.value})} className="bg-slate-900 text-white border border-slate-700 rounded-lg p-3 outline-none focus:border-emerald-500">
+                <option value="ingreso">Ingreso (+)</option><option value="egreso">Egreso (-)</option>
               </select>
-              <input 
-                type="number" 
-                placeholder="Monto ($)" 
-                value={financeForm.amount}
-                onChange={(e) => setFinanceForm({...financeForm, amount: e.target.value})}
-                className="flex-1 bg-slate-900 text-white border border-slate-700 rounded-lg p-3 outline-none focus:border-emerald-500"
-              />
-              <input 
-                type="text" 
-                placeholder="Descripción (ej. Sueldo, Almuerzo)" 
-                value={financeForm.description}
-                onChange={(e) => setFinanceForm({...financeForm, description: e.target.value})}
-                className="flex-[2] bg-slate-900 text-white border border-slate-700 rounded-lg p-3 outline-none focus:border-emerald-500"
-              />
-              <button type="submit" className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-3 rounded-lg font-semibold transition-colors">
-                Añadir
-              </button>
+              <input type="number" placeholder="Monto ($)" value={financeForm.amount} onChange={(e) => setFinanceForm({...financeForm, amount: e.target.value})} className="flex-1 bg-slate-900 text-white border border-slate-700 rounded-lg p-3 outline-none focus:border-emerald-500" />
+              <input type="text" placeholder="Descripción (ej. Sueldo, Almuerzo)" value={financeForm.description} onChange={(e) => setFinanceForm({...financeForm, description: e.target.value})} className="flex-[2] bg-slate-900 text-white border border-slate-700 rounded-lg p-3 outline-none focus:border-emerald-500" />
+              <button type="submit" className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-3 rounded-lg font-semibold transition-colors">Añadir</button>
             </form>
           </div>
-
           <div className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden">
             <h3 className="font-bold text-white p-4 border-b border-slate-700 bg-slate-800/50">Historial Reciente</h3>
             <div className="divide-y divide-slate-700/50">
-              {finances.length === 0 ? (
-                <p className="p-6 text-center text-slate-500">No hay movimientos registrados aún.</p>
-              ) : (
-                finances.slice().reverse().map(item => (
+              {finances.length === 0 ? <p className="p-6 text-center text-slate-500">No hay movimientos registrados aún.</p> : finances.slice().reverse().map(item => (
                   <div key={item.id} className="flex justify-between items-center p-4 hover:bg-slate-700/30">
-                    <div>
-                      <p className="text-slate-200 font-medium">{item.description}</p>
-                      <p className="text-xs text-slate-500">{item.date}</p>
-                    </div>
-                    <div className={`font-bold ${item.type === 'ingreso' ? 'text-emerald-400' : 'text-red-400'}`}>
-                      {item.type === 'ingreso' ? '+' : '-'}${item.amount.toLocaleString()}
-                    </div>
+                    <div><p className="text-slate-200 font-medium">{item.description}</p><p className="text-xs text-slate-500">{item.date}</p></div>
+                    <div className={`font-bold ${item.type === 'ingreso' ? 'text-emerald-400' : 'text-red-400'}`}>{item.type === 'ingreso' ? '+' : '-'}${item.amount.toLocaleString()}</div>
                   </div>
-                ))
-              )}
+                ))}
             </div>
           </div>
         </div>
@@ -716,73 +746,37 @@
             <h2 className="text-2xl font-bold text-white">Control Colon Irritable</h2>
             <p className="text-rose-200/70 text-sm mt-2">Registra tus comidas y síntomas para encontrar patrones.</p>
           </div>
-
           <form onSubmit={addHealthLog} className="bg-slate-800 p-5 rounded-2xl border border-slate-700 space-y-4">
             <div>
               <label className="block text-slate-400 text-sm mb-1">¿Qué comiste?</label>
-              <input 
-                type="text" 
-                placeholder="Ej. Avena con leche de almendras" 
-                value={healthForm.meal}
-                onChange={(e) => setHealthForm({...healthForm, meal: e.target.value})}
-                className="w-full bg-slate-900 text-white border border-slate-700 rounded-lg p-3 outline-none focus:border-rose-500"
-              />
+              <input type="text" placeholder="Ej. Avena con leche de almendras" value={healthForm.meal} onChange={(e) => setHealthForm({...healthForm, meal: e.target.value})} className="w-full bg-slate-900 text-white border border-slate-700 rounded-lg p-3 outline-none focus:border-rose-500" />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-slate-400 text-sm mb-1">Síntomas presentados</label>
-                <select 
-                  value={healthForm.symptoms}
-                  onChange={(e) => setHealthForm({...healthForm, symptoms: e.target.value})}
-                  className="w-full bg-slate-900 text-white border border-slate-700 rounded-lg p-3 outline-none focus:border-rose-500"
-                >
-                  <option value="Ninguno">Ninguno (Me siento bien)</option>
-                  <option value="Inflamación leve">Inflamación leve</option>
-                  <option value="Inflamación severa">Inflamación severa</option>
-                  <option value="Dolor abdominal">Dolor abdominal</option>
-                  <option value="Gases">Gases / Pesadez</option>
+                <select value={healthForm.symptoms} onChange={(e) => setHealthForm({...healthForm, symptoms: e.target.value})} className="w-full bg-slate-900 text-white border border-slate-700 rounded-lg p-3 outline-none focus:border-rose-500">
+                  <option value="Ninguno">Ninguno (Me siento bien)</option><option value="Inflamación leve">Inflamación leve</option><option value="Inflamación severa">Inflamación severa</option><option value="Dolor abdominal">Dolor abdominal</option><option value="Gases">Gases / Pesadez</option>
                 </select>
               </div>
               <div>
                 <label className="block text-slate-400 text-sm mb-1">Nivel de molestia (1-5)</label>
-                <input 
-                  type="range" min="1" max="5" 
-                  value={healthForm.painLevel}
-                  onChange={(e) => setHealthForm({...healthForm, painLevel: parseInt(e.target.value)})}
-                  className="w-full mt-3 accent-rose-500"
-                />
-                <div className="flex justify-between text-xs text-slate-500 mt-1">
-                  <span>1 (Nada)</span> <span>5 (Mucho)</span>
-                </div>
+                <input type="range" min="1" max="5" value={healthForm.painLevel} onChange={(e) => setHealthForm({...healthForm, painLevel: parseInt(e.target.value)})} className="w-full mt-3 accent-rose-500" />
+                <div className="flex justify-between text-xs text-slate-500 mt-1"><span>1 (Nada)</span> <span>5 (Mucho)</span></div>
               </div>
             </div>
-            <button type="submit" className="w-full bg-rose-600 hover:bg-rose-500 text-white py-3 rounded-lg font-semibold transition-colors">
-              Guardar Registro
-            </button>
+            <button type="submit" className="w-full bg-rose-600 hover:bg-rose-500 text-white py-3 rounded-lg font-semibold transition-colors">Guardar Registro</button>
           </form>
-
           <div className="space-y-3">
             <h3 className="font-bold text-white px-1">Diario de Alimentación</h3>
-            {healthLogs.length === 0 ? (
-              <p className="text-center text-slate-500 py-4">No hay registros recientes.</p>
-            ) : (
-              healthLogs.map(log => (
+            {healthLogs.length === 0 ? <p className="text-center text-slate-500 py-4">No hay registros recientes.</p> : healthLogs.map(log => (
                 <div key={log.id} className="bg-slate-800 p-4 rounded-xl border border-slate-700 flex flex-col md:flex-row md:justify-between md:items-center gap-2">
-                  <div>
-                    <p className="text-white font-medium">{log.meal}</p>
-                    <p className="text-xs text-slate-400">{log.date}</p>
-                  </div>
+                  <div><p className="text-white font-medium">{log.meal}</p><p className="text-xs text-slate-400">{log.date}</p></div>
                   <div className="flex items-center gap-3">
-                    <span className={`text-xs px-2 py-1 rounded-full font-semibold ${log.symptoms === 'Ninguno' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-orange-500/20 text-orange-400'}`}>
-                      {log.symptoms}
-                    </span>
-                    <span className="text-xs text-slate-400 flex items-center gap-1">
-                      Nivel: <strong className={log.painLevel > 3 ? 'text-rose-400' : 'text-slate-200'}>{log.painLevel}/5</strong>
-                    </span>
+                    <span className={`text-xs px-2 py-1 rounded-full font-semibold ${log.symptoms === 'Ninguno' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-orange-500/20 text-orange-400'}`}>{log.symptoms}</span>
+                    <span className="text-xs text-slate-400 flex items-center gap-1">Nivel: <strong className={log.painLevel > 3 ? 'text-rose-400' : 'text-slate-200'}>{log.painLevel}/5</strong></span>
                   </div>
                 </div>
-              ))
-            )}
+              ))}
           </div>
         </div>
       );
@@ -791,52 +785,28 @@
         <div className="space-y-6 animate-in">
           <div className="bg-slate-800 p-6 rounded-2xl shadow-lg border border-slate-700">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                <Dumbbell className="text-indigo-500" />
-                Progreso Semanal
-              </h2>
+              <h2 className="text-2xl font-bold text-white flex items-center gap-2"><Dumbbell className="text-indigo-500" /> Progreso Semanal</h2>
               <span className="text-2xl font-bold text-indigo-400">{gymProgress}%</span>
             </div>
             <div className="w-full bg-slate-900 rounded-full h-4 mb-2 overflow-hidden border border-slate-700">
-              <div 
-                className="bg-indigo-500 h-4 rounded-full transition-all duration-1000"
-                style={{ width: `${gymProgress}%` }}
-              ></div>
+              <div className="bg-indigo-500 h-4 rounded-full transition-all duration-1000" style={{ width: `${gymProgress}%` }}></div>
             </div>
             <p className="text-xs text-slate-400 text-right">Completado esta semana</p>
           </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {gymRoutine.map((routine) => (
-              <div 
-                key={routine.id} 
-                onClick={() => toggleGymDay(routine.id)}
-                className={`cursor-pointer p-5 rounded-2xl border transition-all duration-300 ${
-                  routine.completed 
-                    ? 'bg-indigo-900/30 border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.15)]' 
-                    : 'bg-slate-800 border-slate-700 hover:border-slate-500'
-                }`}
-              >
+              <div key={routine.id} onClick={() => toggleGymDay(routine.id)} className={`cursor-pointer p-5 rounded-2xl border transition-all duration-300 ${routine.completed ? 'bg-indigo-900/30 border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.15)]' : 'bg-slate-800 border-slate-700 hover:border-slate-500'}`}>
                 <div className="flex justify-between items-start mb-3">
-                  <span className={`font-bold text-lg ${routine.completed ? 'text-indigo-400' : 'text-white'}`}>
-                    {routine.day}
-                  </span>
-                  {routine.completed ? (
-                    <CheckCircle2 className="w-6 h-6 text-indigo-400" />
-                  ) : (
-                    <Circle className="w-6 h-6 text-slate-500" />
-                  )}
+                  <span className={`font-bold text-lg ${routine.completed ? 'text-indigo-400' : 'text-white'}`}>{routine.day}</span>
+                  {routine.completed ? <CheckCircle2 className="w-6 h-6 text-indigo-400" /> : <Circle className="w-6 h-6 text-slate-500" />}
                 </div>
-                <p className={`text-sm ${routine.completed ? 'text-indigo-200' : 'text-slate-400'}`}>
-                  Enfoque: <strong className="font-semibold">{routine.focus}</strong>
-                </p>
+                <p className={`text-sm ${routine.completed ? 'text-indigo-200' : 'text-slate-400'}`}>Enfoque: <strong className="font-semibold">{routine.focus}</strong></p>
               </div>
             ))}
           </div>
         </div>
       );
 
-      // ================= NAVEGACIÓN =================
       const navItems = [
         { id: 'habits', icon: CheckCircle2, label: 'Hábitos' },
         { id: 'goals', icon: Target, label: 'Metas' },
@@ -848,19 +818,13 @@
       return (
         <div className="min-h-screen bg-slate-900 text-slate-200 font-sans pb-20 md:pb-0 md:pl-24">
           <aside className="hidden md:flex flex-col w-24 fixed h-full left-0 top-0 bg-slate-950 border-r border-slate-800 items-center py-8 z-50">
-            <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-blue-500 rounded-xl flex items-center justify-center mb-10 shadow-lg shadow-emerald-500/20 text-white font-bold text-xl">
-              A
-            </div>
+            <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-blue-500 rounded-xl flex items-center justify-center mb-10 shadow-lg shadow-emerald-500/20 text-white font-bold text-xl">A</div>
             <nav className="flex flex-col gap-6 w-full">
               {navItems.map(item => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.id;
                 return (
-                  <button
-                    key={item.id}
-                    onClick={() => setActiveTab(item.id)}
-                    className={`flex flex-col items-center justify-center w-full py-3 relative group transition-colors ${isActive ? 'text-emerald-400' : 'text-slate-500 hover:text-slate-300'}`}
-                  >
+                  <button key={item.id} onClick={() => setActiveTab(item.id)} className={`flex flex-col items-center justify-center w-full py-3 relative group transition-colors ${isActive ? 'text-emerald-400' : 'text-slate-500 hover:text-slate-300'}`}>
                     {isActive && <div className="absolute left-0 w-1 h-full bg-emerald-500 rounded-r-full" />}
                     <Icon className="w-6 h-6 mb-1" />
                     <span className="text-[10px] uppercase font-bold tracking-wider">{item.label}</span>
@@ -872,9 +836,7 @@
 
           <main className="max-w-5xl mx-auto p-4 md:p-8">
             <header className="mb-8 pt-4 md:pt-0">
-              <h1 className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-blue-500 mb-1">
-                Adventure
-              </h1>
+              <h1 className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-blue-500 mb-1">Adventure</h1>
               <p className="text-slate-400 text-sm md:text-base">Tu centro de gestión personal e implacable.</p>
             </header>
 
@@ -890,11 +852,7 @@
               const Icon = item.icon;
               const isActive = activeTab === item.id;
               return (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveTab(item.id)}
-                  className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${isActive ? 'text-emerald-400' : 'text-slate-500'}`}
-                >
+                <button key={item.id} onClick={() => setActiveTab(item.id)} className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${isActive ? 'text-emerald-400' : 'text-slate-500'}`}>
                   <Icon className={`w-5 h-5 ${isActive ? 'scale-110' : ''} transition-transform`} />
                   <span className="text-[9px] font-medium">{item.label}</span>
                 </button>
@@ -905,7 +863,6 @@
       );
     }
 
-    // Renderizado en el DOM
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
   </script>
