@@ -1,11 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <link rel="manifest" href="./manifest.json">
-<meta name="theme-color" content="#10b981">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Adventure - Gestión Personal</title>
@@ -129,27 +124,50 @@
     
     const getTodayString = () => getLocalString(new Date());
 
+    // --- HOOK PERSONALIZADO PARA LOCALSTORAGE ---
+    const useLocalStorage = (key, initialValue) => {
+      const [state, setState] = useState(() => {
+        try {
+          const item = window.localStorage.getItem(key);
+          return item ? JSON.parse(item) : initialValue;
+        } catch (error) {
+          console.warn("Error leyendo localStorage", error);
+          return initialValue;
+        }
+      });
+
+      useEffect(() => {
+        try {
+          window.localStorage.setItem(key, JSON.stringify(state));
+        } catch (error) {
+          console.warn("Error guardando en localStorage", error);
+        }
+      }, [key, state]);
+
+      return [state, setState];
+    };
+
     function App() {
       const [activeTab, setActiveTab] = useState('habits');
 
-      // --- ESTADOS ---
-      const [habitsList, setHabitsList] = useState(INITIAL_HABITS_TEMPLATE);
-      const [habitCompletions, setHabitCompletions] = useState({}); 
+      // --- ESTADOS (AHORA CON PERSISTENCIA LOCAL) ---
+      const [habitsList, setHabitsList] = useLocalStorage('adv_habitsList', INITIAL_HABITS_TEMPLATE);
+      const [habitCompletions, setHabitCompletions] = useLocalStorage('adv_habitCompletions', {}); 
       const [selectedDate, setSelectedDate] = useState(getTodayString());
       const [isEditingHabits, setIsEditingHabits] = useState(false);
       const [newHabit, setNewHabit] = useState({ text: '', startTime: '', endTime: '', category: 'rutina' });
 
-      const [finances, setFinances] = useState([]);
+      const [finances, setFinances] = useLocalStorage('adv_finances', []);
       const [financeForm, setFinanceForm] = useState({ type: 'ingreso', amount: '', description: '' });
       
-      const [globalGoal, setGlobalGoal] = useState('Lanzar mi emprendimiento principal este mes');
+      const [globalGoal, setGlobalGoal] = useLocalStorage('adv_globalGoal', 'Lanzar mi emprendimiento principal este mes');
       const [expandedDay, setExpandedDay] = useState('Lunes');
-      const [weeklyGoals, setWeeklyGoals] = useState(WEEK_DAYS.map(day => ({ day, dailyGoal: '', tasks: [] })));
+      const [weeklyGoals, setWeeklyGoals] = useLocalStorage('adv_weeklyGoals', WEEK_DAYS.map(day => ({ day, dailyGoal: '', tasks: [] })));
       const [newTask, setNewTask] = useState({ text: '', time: '' });
 
-      const [healthLogs, setHealthLogs] = useState([]);
+      const [healthLogs, setHealthLogs] = useLocalStorage('adv_healthLogs', []);
       const [healthForm, setHealthForm] = useState({ meal: '', symptoms: 'Ninguno', painLevel: 1 });
-      const [gymRoutine, setGymRoutine] = useState([
+      const [gymRoutine, setGymRoutine] = useLocalStorage('adv_gymRoutine', [
         { id: 1, day: 'Lunes', focus: 'Pecho y Tríceps', completed: false },
         { id: 2, day: 'Martes', focus: 'Espalda y Bíceps', completed: false },
         { id: 3, day: 'Miércoles', focus: 'Pierna (Cuádriceps)', completed: false },
