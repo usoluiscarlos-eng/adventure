@@ -3,9 +3,9 @@
 <head>
   <link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#10b981">
+
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Adventure - Gestión Personal</title>
@@ -181,7 +181,9 @@
 
 
       // ================= LÓGICA AVANZADA DE HÁBITOS =================
-      const currentCompletedIds = habitCompletions[selectedDate] || [];
+      // Identificar IDs válidos actuales para ignorar "fantasmas"
+      const validHabitIds = useMemo(() => new Set(habitsList.map(h => h.id)), [habitsList]);
+      const currentCompletedIds = (habitCompletions[selectedDate] || []).filter(id => validHabitIds.has(id));
 
       const toggleHabitCompletion = (id) => {
         setHabitCompletions(prev => {
@@ -202,6 +204,14 @@
 
       const handleDeleteHabit = (id) => {
         setHabitsList(habitsList.filter(h => h.id !== id));
+        // Limpiar historial del hábito eliminado para evitar contadores atascados
+        setHabitCompletions(prev => {
+          const updatedCompletions = { ...prev };
+          Object.keys(updatedCompletions).forEach(date => {
+            updatedCompletions[date] = updatedCompletions[date].filter(completedId => completedId !== id);
+          });
+          return updatedCompletions;
+        });
       };
 
       const handleAddHabit = () => {
@@ -236,7 +246,7 @@
           const d = new Date(baseDate);
           d.setDate(d.getDate() - i);
           const dateStr = getLocalString(d);
-          const completedToday = habitCompletions[dateStr] || [];
+          const completedToday = (habitCompletions[dateStr] || []).filter(id => validHabitIds.has(id));
           completedToday.forEach(id => {
             if(habitCounts[id] !== undefined) habitCounts[id]++;
           });
@@ -259,7 +269,7 @@
           const d = new Date(baseDate);
           d.setDate(d.getDate() - i);
           const dateStr = getLocalString(d);
-          const completedIds = habitCompletions[dateStr] || [];
+          const completedIds = (habitCompletions[dateStr] || []).filter(id => validHabitIds.has(id));
           const hits = completedIds.length;
 
           if (i < 7) {
@@ -440,7 +450,7 @@
               <div className="w-full bg-slate-900 rounded-full h-2.5 mb-1 mt-2">
                 <div 
                   className="bg-blue-500 h-2.5 rounded-full transition-all duration-1000"
-                  style={{ width: `${habitsList.length > 0 ? (currentCompletedIds.length / habitsList.length) * 100 : 0}%` }}
+                  style={{ width: `${Math.min(habitsList.length > 0 ? (currentCompletedIds.length / habitsList.length) * 100 : 0, 100)}%` }}
                 ></div>
               </div>
               <span className="text-xs font-medium text-white text-right">
