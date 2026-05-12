@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Adventure - Gestión Personal</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- React & ReactDOM -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+
+  <!-- Babel para compilar JSX directamente en el navegador -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    body {
+      background-color: #0f172a; /* bg-slate-900 */
+      color: #e2e8f0; /* text-slate-200 */
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+    .animate-in { animation: fadeIn 0.4s ease-out forwards; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    /* Estilos para el scrollbar para mantener un diseño limpio */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    
+    /* Estilo para los inputs de tipo time */
+    input[type="time"]::-webkit-calendar-picker-indicator {
+      filter: invert(1);
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+
+    // --- ICONOS COMPATIBLES (Reemplazando lucide-react) ---
+    const IconWrapper = ({ children, className = "", ...props }) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`lucide ${className}`} {...props}>
+        {children}
+      </svg>
+    );
+
+    const CheckCircle2 = (p) => <IconWrapper {...p}><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></IconWrapper>;
+    const Circle = (p) => <IconWrapper {...p}><circle cx="12" cy="12" r="10"/></IconWrapper>;
+    const Target = (p) => <IconWrapper {...p}><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></IconWrapper>;
+    const DollarSign = (p) => <IconWrapper {...p}><line x1="12" x2="12" y1="2" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></IconWrapper>;
+    const Activity = (p) => <IconWrapper {...p}><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></IconWrapper>;
+    const Dumbbell = (p) => <IconWrapper {...p}><path d="M14.4 14.4 9.6 9.6"/><path d="M18.65 21.35a2 2 0 0 1-2.83 0l-5.66-5.66a2 2 0 0 1 0-2.83l.06-.06a2 2 0 0 1 2.83 0l5.66 5.66a2 2 0 0 1 0 2.83Z"/><path d="m21.5 21.5-1.4-1.4"/><path d="M3.9 3.9 2.5 2.5"/><path d="M6.4 2.65a2 2 0 0 1 2.83 0l5.66 5.66a2 2 0 0 1 0 2.83l-.06.06a2 2 0 0 1-2.83 0L6.34 5.48a2 2 0 0 1 0-2.83Z"/></IconWrapper>;
+    const Plus = (p) => <IconWrapper {...p}><path d="M5 12h14"/><path d="M12 5v14"/></IconWrapper>;
+    const Trash2 = (p) => <IconWrapper {...p}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></IconWrapper>;
+    const TrendingUp = (p) => <IconWrapper {...p}><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></IconWrapper>;
+    const TrendingDown = (p) => <IconWrapper {...p}><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/></IconWrapper>;
+    const ListTodo = (p) => <IconWrapper {...p}><rect x="3" y="5" width="6" height="6" rx="1"/><path d="m3 17 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/></IconWrapper>;
+    const Settings = (p) => <IconWrapper {...p}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></IconWrapper>;
+    const CalendarDays = (p) => <IconWrapper {...p}><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></IconWrapper>;
+    const ChevronDown = (p) => <IconWrapper {...p}><path d="m6 9 6 6 6-6"/></IconWrapper>;
+    const ChevronUp = (p) => <IconWrapper {...p}><path d="m18 15-6-6-6 6"/></IconWrapper>;
+    const Clock = (p) => <IconWrapper {...p}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></IconWrapper>;
+    const BarChart = (p) => <IconWrapper {...p}><line x1="12" x2="12" y1="20" y2="10"/><line x1="18" x2="18" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="16"/></IconWrapper>;
+
+    // --- DATA INICIAL ---
+    const INITIAL_HABITS_TEMPLATE = [
+      { id: 1, startTime: '06:30', endTime: '06:50', text: 'Despertarse y tomar agua' },
+      { id: 2, startTime: '06:45', endTime: '07:00', text: 'Estiramientos corporales' },
+      { id: 3, startTime: '07:00', endTime: '07:20', text: 'Desayunar' },
+      { id: 4, startTime: '07:20', endTime: '07:45', text: 'Bañarme y alistarme' },
+      { id: 5, startTime: '08:00', endTime: '08:30', text: 'Verificar asuntos' },
+      { id: 6, startTime: '08:30', endTime: '10:00', text: 'Trabajo enfocado' },
+      { id: 7, startTime: '17:00', endTime: '19:00', text: 'Rutina de entrenamiento (Gym)' },
+    ];
+
+    const WEEK_DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+
+    const STATUS_CONFIG = {
+      'sin_empezar': { label: 'Sin empezar', color: 'bg-slate-700 text-slate-300 border-slate-600' },
+      'en_curso': { label: 'En curso', color: 'bg-blue-900/40 text-blue-400 border-blue-700/50' },
+      'realizado': { label: 'Realizado', color: 'bg-emerald-900/40 text-emerald-400 border-emerald-700/50' }
+    };
+
+    // Helper para obtener fecha actual en formato YYYY-MM-DD local
+    const getTodayString = () => {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+
+    function App() {
+      const [activeTab, setActiveTab] = useState('habits');
+
+      // --- ESTADOS: HÁBITOS ---
+      const [habitsList, setHabitsList] = useState(INITIAL_HABITS_TEMPLATE);
+      const [habitCompletions, setHabitCompletions] = useState({}); // Formato: { 'YYYY-MM-DD': [id1, id2] }
+      const [selectedDate, setSelectedDate] = useState(getTodayString());
+      const [isEditingHabits, setIsEditingHabits] = useState(false);
+      const [newHabit, setNewHabit] = useState({ text: '', startTime: '', endTime: '' });
+
+      // --- ESTADOS: FINANZAS ---
+      const [finances, setFinances] = useState([]);
+      const [financeForm, setFinanceForm] = useState({ type: 'ingreso', amount: '', description: '' });
+      
+      // --- ESTADOS: METAS ---
+      const [globalGoal, setGlobalGoal] = useState('Lanzar mi emprendimiento principal este mes');
+      const [expandedDay, setExpandedDay] = useState('Lunes');
+      const [weeklyGoals, setWeeklyGoals] = useState(
+        WEEK_DAYS.map(day => ({ day, dailyGoal: '', tasks: [] }))
+      );
+      const [newTask, setNewTask] = useState({ text: '', time: '' });
+
+      // --- ESTADOS: SALUD Y GYM ---
+      const [healthLogs, setHealthLogs] = useState([]);
+      const [healthForm, setHealthForm] = useState({ meal: '', symptoms: 'Ninguno', painLevel: 1 });
+      const [gymRoutine, setGymRoutine] = useState([
+        { id: 1, day: 'Lunes', focus: 'Pecho y Tríceps', completed: false },
+        { id: 2, day: 'Martes', focus: 'Espalda y Bíceps', completed: false },
+        { id: 3, day: 'Miércoles', focus: 'Pierna (Cuádriceps)', completed: false },
+        { id: 4, day: 'Jueves', focus: 'Hombros y Abdomen', completed: false },
+        { id: 5, day: 'Viernes', focus: 'Pierna (Femoral y Glúteo)', completed: false },
+      ]);
+
+      // ================= LÓGICA DE HÁBITOS =================
+      const currentCompletedIds = habitCompletions[selectedDate] || [];
+
+      const toggleHabitCompletion = (id) => {
+        setHabitCompletions(prev => {
+          const dayCompletions = prev[selectedDate] || [];
+          const isCompleted = dayCompletions.includes(id);
+          
+          return {
+            ...prev,
+            [selectedDate]: isCompleted 
+              ? dayCompletions.filter(habitId => habitId !== id)
+              : [...dayCompletions, id]
+          };
+        });
+      };
+
+      const dailyProgress = useMemo(() => {
+        if (habitsList.length === 0) return 0;
+        return Math.round((currentCompletedIds.length / habitsList.length) * 100);
+      }, [currentCompletedIds, habitsList]);
+
+      // Funciones de Edición de Hábitos
+      const handleUpdateHabit = (id, field, value) => {
+        setHabitsList(habitsList.map(h => h.id === id ? { ...h, [field]: value } : h));
+      };
+
+      const handleDeleteHabit = (id) => {
+        setHabitsList(habitsList.filter(h => h.id !== id));
+      };
+
+      const handleAddHabit = () => {
+        if (!newHabit.text.trim()) return;
+        setHabitsList([...habitsList, { id: Date.now(), text: newHabit.text, startTime: newHabit.startTime, endTime: newHabit.endTime }]);
+        setNewHabit({ text: '', startTime: '', endTime: '' });
+      };
+
+      // Cálculo para Gráfico de Tendencias (Últimos 7 días)
+      const trendData = useMemo(() => {
+        const data = [];
+        // Parsear la fecha seleccionada localmente para evitar desfases de zona horaria (ej: UTC-5)
+        const [year, month, day] = selectedDate.split('-').map(Number);
+        
+        for (let i = 6; i >= 0; i--) {
+          const d = new Date(year, month - 1, day);
+          d.setDate(d.getDate() - i); 
+          
+          const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+          
+          const dayCompletions = habitCompletions[dateStr] || [];
+          // El porcentaje se basa en el número de hábitos actuales para mantenerlo simple y dinámico
+          const percentage = habitsList.length > 0 ? Math.round((dayCompletions.length / habitsList.length) * 100) : 0;
+          
+          const isTodayStr = dateStr === selectedDate;
+          data.push({ 
+            date: dateStr, 
+            dayName: d.toLocaleDateString('es-ES', { weekday: 'short' }), 
+            percentage: percentage > 100 ? 100 : percentage, // Limitar a 100% si hay hábitos extras borrados
+            isSelected: isTodayStr 
+          });
+        }
+        return data;
+      }, [habitCompletions, habitsList.length, selectedDate]);
+
+
+      // ================= LÓGICA DE METAS (80/20) =================
+      const addTaskToDay = (dayIndex) => {
+        if (!newTask.text.trim()) return;
+        const updatedGoals = [...weeklyGoals];
+        updatedGoals[dayIndex].tasks.push({ 
+          id: Date.now(), 
+          text: newTask.text, 
+          time: newTask.time,
+          status: 'sin_empezar', 
+          is8020: true 
+        });
+        setWeeklyGoals(updatedGoals);
+        setNewTask({ text: '', time: '' });
+      };
+
+      const updateTaskStatus = (dayIndex, taskId, newStatus) => {
+        const updatedGoals = [...weeklyGoals];
+        updatedGoals[dayIndex].tasks = updatedGoals[dayIndex].tasks.map(t => 
+          t.id === taskId ? { ...t, status: newStatus } : t
+        );
+        setWeeklyGoals(updatedGoals);
+      };
+
+      const deleteTask = (dayIndex, taskId) => {
+        const updatedGoals = [...weeklyGoals];
+        updatedGoals[dayIndex].tasks = updatedGoals[dayIndex].tasks.filter(t => t.id !== taskId);
+        setWeeklyGoals(updatedGoals);
+      };
+
+      const updateDailyGoal = (dayIndex, text) => {
+        const updatedGoals = [...weeklyGoals];
+        updatedGoals[dayIndex].dailyGoal = text;
+        setWeeklyGoals(updatedGoals);
+      };
+
+      // ================= OTRAS FUNCIONES =================
+      const addTransaction = (e) => {
+        e.preventDefault();
+        if (!financeForm.amount || !financeForm.description) return;
+        setFinances([...finances, { id: Date.now(), ...financeForm, amount: parseFloat(financeForm.amount), date: new Date().toLocaleDateString() }]);
+        setFinanceForm({ type: 'ingreso', amount: '', description: '' });
+      };
+      const financeTotals = useMemo(() => {
+        return finances.reduce((acc, curr) => {
+          if (curr.type === 'ingreso') acc.income += curr.amount;
+          else acc.expense += curr.amount;
+          return acc;
+        }, { income: 0, expense: 0 });
+      }, [finances]);
+
+      const addHealthLog = (e) => {
+        e.preventDefault();
+        if (!healthForm.meal) return;
+        setHealthLogs([{ id: Date.now(), date: new Date().toLocaleString(), ...healthForm }, ...healthLogs]);
+        setHealthForm({ meal: '', symptoms: 'Ninguno', painLevel: 1 });
+      };
+
+      const toggleGymDay = (id) => {
+        setGymRoutine(gymRoutine.map(g => g.id === id ? { ...g, completed: !g.completed } : g));
+      };
+      const gymProgress = useMemo(() => {
+        const completed = gymRoutine.filter(g => g.completed).length;
+        return Math.round((completed / gymRoutine.length) * 100) || 0;
+      }, [gymRoutine]);
+
+
+      // ================= COMPONENTES UI =================
+      const CircularProgressBar = ({ percentage }) => {
+        const radius = 45;
+        const circumference = 2 * Math.PI * radius;
+        const offset = circumference - (percentage / 100) * circumference;
+
+        return (
+          <div className="relative flex items-center justify-center w-36 h-36 md:w-40 md:h-40">
+            <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+              <circle className="text-slate-700 stroke-current" strokeWidth="8" cx="50" cy="50" r={radius} fill="transparent" />
+              <circle
+                className="text-emerald-500 stroke-current transition-all duration-1000 ease-in-out"
+                strokeWidth="8" strokeLinecap="round" cx="50" cy="50" r={radius} fill="transparent"
+                strokeDasharray={circumference} strokeDashoffset={offset}
+              />
+            </svg>
+            <div className="absolute flex flex-col items-center justify-center text-white">
+              <span className="text-3xl font-bold">{percentage}%</span>
+              <span className="text-[10px] uppercase tracking-wider text-slate-400">Progreso</span>
+            </div>
+          </div>
+        );
+      };
+
+      // ================= RENDERIZADO DE PESTAÑAS =================
+      const renderHabits = () => (
+        <div className="space-y-6 animate-in">
+          
+          {/* Controles Superiores: Fecha y Ajustes */}
+          <div className="flex flex-col sm:flex-row justify-between items-center bg-slate-800 p-4 rounded-2xl shadow-lg border border-slate-700 gap-4">
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <CalendarDays className="text-emerald-500 w-6 h-6" />
+              <input 
+                type="date" 
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="bg-slate-900 border border-slate-600 rounded-lg p-2 text-white outline-none focus:border-emerald-500 w-full sm:w-auto"
+              />
+            </div>
+            <button 
+              onClick={() => setIsEditingHabits(!isEditingHabits)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors w-full sm:w-auto justify-center ${isEditingHabits ? 'bg-emerald-600 text-white' : 'bg-slate-700 hover:bg-slate-600 text-slate-200'}`}
+            >
+              {isEditingHabits ? <CheckCircle2 className="w-4 h-4" /> : <Settings className="w-4 h-4" />}
+              {isEditingHabits ? 'Finalizar Edición' : 'Gestionar Hábitos'}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Panel de Progreso y Checklist Estructurado en Tabla */}
+            <div className="bg-slate-800 rounded-2xl shadow-lg border border-slate-700 overflow-hidden flex flex-col">
+              <div className="p-6 border-b border-slate-700 flex flex-col items-center bg-slate-800/50">
+                <h3 className="font-semibold text-white flex items-center gap-2 mb-4 w-full justify-center">
+                  <ListTodo className="w-5 h-5 text-emerald-500" />
+                  Estado del Día Seleccionado
+                </h3>
+                <CircularProgressBar percentage={dailyProgress} />
+              </div>
+
+              <div className="flex-1 overflow-x-auto max-h-[500px]">
+                {isEditingHabits ? (
+                  // MODO EDICIÓN EN TABLA
+                  <div className="p-4 bg-slate-900/50 min-w-[500px]">
+                    <table className="w-full text-left text-sm text-slate-300 mb-6">
+                      <thead className="text-xs uppercase text-slate-400 border-b border-slate-700">
+                        <tr>
+                          <th className="pb-3 pr-2">Hábito</th>
+                          <th className="pb-3 px-2 w-28">Hora Inicio</th>
+                          <th className="pb-3 px-2 w-28">Hora Fin</th>
+                          <th className="pb-3 pl-2 w-12 text-center">X</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800">
+                        {habitsList.map((habit) => (
+                          <tr key={habit.id}>
+                            <td className="py-2 pr-2">
+                              <input 
+                                value={habit.text} 
+                                onChange={(e) => handleUpdateHabit(habit.id, 'text', e.target.value)}
+                                placeholder="Nombre del hábito"
+                                className="bg-slate-900 text-sm text-white border border-slate-600 rounded p-2 outline-none focus:border-emerald-500 w-full"
+                              />
+                            </td>
+                            <td className="py-2 px-2">
+                              <input 
+                                type="time"
+                                value={habit.startTime} 
+                                onChange={(e) => handleUpdateHabit(habit.id, 'startTime', e.target.value)}
+                                className="bg-slate-900 text-xs text-emerald-400 border border-slate-600 rounded p-2 outline-none focus:border-emerald-500 w-full"
+                              />
+                            </td>
+                            <td className="py-2 px-2">
+                              <input 
+                                type="time"
+                                value={habit.endTime} 
+                                onChange={(e) => handleUpdateHabit(habit.id, 'endTime', e.target.value)}
+                                className="bg-slate-900 text-xs text-emerald-400 border border-slate-600 rounded p-2 outline-none focus:border-emerald-500 w-full"
+                              />
+                            </td>
+                            <td className="py-2 pl-2">
+                              <button onClick={() => handleDeleteHabit(habit.id)} className="bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white p-2 rounded transition-colors w-full flex justify-center items-center">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    
+                    {/* Agregar Nuevo */}
+                    <div className="border-t border-slate-700 pt-4">
+                      <h4 className="text-sm font-semibold text-emerald-400 mb-3 flex items-center gap-1"><Plus className="w-4 h-4" /> Agregar Nuevo Hábito</h4>
+                      <div className="flex gap-2">
+                        <input 
+                          value={newHabit.text} 
+                          onChange={(e) => setNewHabit({...newHabit, text: e.target.value})}
+                          placeholder="Descripción del nuevo hábito"
+                          onKeyPress={(e) => e.key === 'Enter' && handleAddHabit()}
+                          className="bg-slate-900 text-sm text-white border border-slate-600 rounded p-2 outline-none flex-1 focus:border-emerald-500"
+                        />
+                        <input 
+                          type="time"
+                          value={newHabit.startTime} 
+                          onChange={(e) => setNewHabit({...newHabit, startTime: e.target.value})}
+                          className="bg-slate-900 text-xs text-white border border-slate-600 rounded p-2 outline-none w-28 focus:border-emerald-500"
+                        />
+                        <input 
+                          type="time"
+                          value={newHabit.endTime} 
+                          onChange={(e) => setNewHabit({...newHabit, endTime: e.target.value})}
+                          className="bg-slate-900 text-xs text-white border border-slate-600 rounded p-2 outline-none w-28 focus:border-emerald-500"
+                        />
+                        <button onClick={handleAddHabit} className="bg-emerald-600 text-white px-3 py-2 rounded hover:bg-emerald-500 flex justify-center items-center">
+                          Añadir
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  // MODO CHECKLIST EN TABLA
+                  habitsList.length === 0 ? (
+                    <div className="p-8 text-center text-slate-500 text-sm">No hay hábitos. Activa "Gestionar Hábitos" para agregar.</div>
+                  ) : (
+                    <table className="w-full text-left text-sm text-slate-300 min-w-[450px]">
+                      <thead className="bg-slate-800/80 text-xs uppercase text-slate-400 border-b border-slate-700">
+                        <tr>
+                          <th className="px-4 py-3 font-semibold text-center w-16">Estado</th>
+                          <th className="px-4 py-3 font-semibold">Hábito</th>
+                          <th className="px-4 py-3 font-semibold w-24">Inicio</th>
+                          <th className="px-4 py-3 font-semibold w-24">Fin</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-700/50">
+                        {habitsList.map((habit) => {
+                          const isCompleted = currentCompletedIds.includes(habit.id);
+                          return (
+                            <tr key={habit.id} className="hover:bg-slate-700/30 transition-colors">
+                              <td className="px-4 py-3 text-center">
+                                <button onClick={() => toggleHabitCompletion(habit.id)} className="focus:outline-none translate-y-[2px]">
+                                  {isCompleted ? <CheckCircle2 className="w-6 h-6 text-emerald-500 mx-auto" /> : <Circle className="w-6 h-6 text-slate-500 mx-auto" />}
+                                </button>
+                              </td>
+                              <td className={`px-4 py-3 font-medium transition-colors ${isCompleted ? 'text-slate-500 line-through' : 'text-slate-200'}`}>
+                                {habit.text}
+                              </td>
+                              <td className="px-4 py-3 text-xs text-emerald-400/80 whitespace-nowrap">
+                                <div className="flex items-center gap-1">
+                                  <Clock className="w-3 h-3" /> {habit.startTime || '--:--'}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-xs text-emerald-400/80 whitespace-nowrap">
+                                <div className="flex items-center gap-1">
+                                  <Clock className="w-3 h-3" /> {habit.endTime || '--:--'}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )
+                )}
+              </div>
+            </div>
+
+            {/* Panel Gráfico de Tendencia (Histograma de Barras) */}
+            <div className="bg-slate-800 rounded-2xl shadow-lg border border-slate-700 p-6 flex flex-col">
+              <h3 className="font-semibold text-white flex items-center gap-2 mb-6 border-b border-slate-700 pb-4">
+                <BarChart className="w-5 h-5 text-blue-500" />
+                Comparación Semanal (Progreso %)
+              </h3>
+              
+              <div className="relative flex-1 flex items-end justify-between gap-3 h-56 mt-auto pb-6 pl-8 pr-2">
+                {/* Líneas de cuadrícula del Eje Y */}
+                <div className="absolute inset-0 flex flex-col justify-between pb-6 pl-6 pointer-events-none z-0">
+                  {[100, 75, 50, 25, 0].map(val => (
+                    <div key={val} className="flex items-center w-full border-b border-slate-700/50 h-0 relative">
+                      <span className="text-[10px] text-slate-400 absolute -left-8 transform -translate-y-1/2 bg-slate-800 px-1 w-7 text-right">
+                        {val}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Barras del Histograma */}
+                {trendData.map((data, i) => (
+                  <div key={i} className="flex flex-col items-center w-full group relative z-10 h-full justify-end">
+                    <span className="text-[10px] font-bold text-slate-200 mb-1 opacity-0 group-hover:opacity-100 transition-opacity absolute -top-5 bg-slate-900 px-2 py-0.5 rounded border border-slate-700">
+                      {data.percentage}%
+                    </span>
+                    <div 
+                      className={`w-full max-w-[2.5rem] rounded-t-md transition-all duration-700 ease-out relative ${
+                        data.isSelected 
+                          ? 'bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.25)]' 
+                          : 'bg-blue-600/60 hover:bg-blue-500'
+                      }`} 
+                      style={{ 
+                        height: `${data.percentage}%`, 
+                        minHeight: data.percentage > 0 ? '4px' : '2px' 
+                      }}
+                    >
+                    </div>
+                    <span className={`text-[10px] absolute -bottom-6 uppercase tracking-wider ${
+                      data.isSelected ? 'text-emerald-400 font-bold' : 'text-slate-400'
+                    }`}>
+                      {data.dayName}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-slate-500 text-center mt-8">
+                Histórico de cumplimiento relativo a los 7 días previos a: <strong className="text-slate-400">{selectedDate}</strong>.
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+
+      const renderGoals = () => (
+        <div className="space-y-6 animate-in">
+          <div className="bg-gradient-to-r from-blue-900 to-slate-800 p-6 rounded-2xl shadow-lg border border-blue-800">
+            <label className="block text-blue-200 text-sm font-semibold mb-2">META GLOBAL DE LA SEMANA</label>
+            <input 
+              type="text" 
+              value={globalGoal}
+              onChange={(e) => setGlobalGoal(e.target.value)}
+              className="w-full bg-transparent text-xl md:text-2xl font-bold text-white border-b-2 border-blue-500 focus:outline-none focus:border-blue-300 pb-2"
+              placeholder="Escribe tu meta principal aquí..."
+            />
+            <p className="text-sm text-blue-300 mt-3 flex items-center gap-2">
+              <Target className="w-4 h-4" /> Principio 80/20: Enfócate en el 20% de acciones que dan el 80% de resultados.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            {weeklyGoals.map((dayPlan, index) => {
+              const isExpanded = expandedDay === dayPlan.day;
+              
+              return (
+                <div key={dayPlan.day} className={`bg-slate-800 rounded-xl border transition-all duration-300 overflow-hidden ${isExpanded ? 'border-emerald-500/50 shadow-lg' : 'border-slate-700 hover:border-slate-600'}`}>
+                  
+                  {/* Acordeón Header */}
+                  <button 
+                    onClick={() => setExpandedDay(isExpanded ? null : dayPlan.day)}
+                    className="w-full flex items-center justify-between p-4 bg-slate-800/80 focus:outline-none"
+                  >
+                    <div className="flex items-center gap-3">
+                      <h3 className={`font-bold text-lg ${isExpanded ? 'text-emerald-400' : 'text-slate-200'}`}>
+                        {dayPlan.day}
+                      </h3>
+                      {!isExpanded && dayPlan.tasks.length > 0 && (
+                        <span className="text-xs bg-slate-700 text-slate-300 px-2 py-1 rounded-full">
+                          {dayPlan.tasks.length} tareas
+                        </span>
+                      )}
+                    </div>
+                    {isExpanded ? <ChevronUp className="text-slate-400" /> : <ChevronDown className="text-slate-400" />}
+                  </button>
+
+                  {/* Acordeón Body */}
+                  {isExpanded && (
+                    <div className="p-4 border-t border-slate-700/50 bg-slate-900/30">
+                      <div className="mb-6">
+                        <label className="text-xs font-semibold text-slate-400 uppercase mb-1 block">Meta General del Día</label>
+                        <input 
+                          type="text" 
+                          placeholder="Ej: Terminar módulo 1 del curso..." 
+                          value={dayPlan.dailyGoal}
+                          onChange={(e) => updateDailyGoal(index, e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-sm text-white focus:border-emerald-500 focus:outline-none"
+                        />
+                      </div>
+                      
+                      {/* Lista de Tareas */}
+                      <div className="space-y-3 mb-6">
+                        <label className="text-xs font-semibold text-slate-400 uppercase block">Actividades Clave (20%)</label>
+                        {dayPlan.tasks.length === 0 ? (
+                          <p className="text-sm text-slate-500 italic">No hay actividades registradas aún.</p>
+                        ) : (
+                          dayPlan.tasks.map(task => (
+                            <div key={task.id} className={`flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-lg border ${STATUS_CONFIG[task.status].color}`}>
+                              <div className="flex-1">
+                                <span className="text-sm font-medium flex items-center gap-2">
+                                  <span className="text-[10px] bg-black/20 px-1.5 py-0.5 rounded font-bold uppercase">20%</span>
+                                  {task.text}
+                                </span>
+                                {task.time && (
+                                  <span className="text-xs mt-1 flex items-center gap-1 opacity-80">
+                                    <Clock className="w-3 h-3" /> {task.time}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              <div className="flex items-center gap-2 mt-2 sm:mt-0">
+                                <select 
+                                  value={task.status}
+                                  onChange={(e) => updateTaskStatus(index, task.id, e.target.value)}
+                                  className="text-xs bg-black/20 border border-transparent rounded p-1.5 outline-none cursor-pointer hover:border-white/20 font-medium"
+                                >
+                                  <option value="sin_empezar" className="bg-slate-800 text-white">Sin empezar</option>
+                                  <option value="en_curso" className="bg-slate-800 text-white">En curso</option>
+                                  <option value="realizado" className="bg-slate-800 text-white">Realizado</option>
+                                </select>
+                                <button onClick={() => deleteTask(index, task.id)} className="p-1.5 hover:bg-black/20 rounded transition-colors text-inherit opacity-70 hover:opacity-100">
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+
+                      {/* Formulario Nueva Tarea */}
+                      <div className="bg-slate-800 p-3 rounded-lg border border-slate-700">
+                        <h4 className="text-xs font-semibold text-emerald-400 mb-2 flex items-center gap-1"><Plus className="w-3 h-3"/> Agregar Actividad</h4>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <input 
+                            type="text" 
+                            placeholder="Horario (Ej. 10:00am - 12:00pm)" 
+                            value={newTask.time}
+                            onChange={(e) => setNewTask({...newTask, time: e.target.value})}
+                            className="bg-slate-900 border border-slate-600 rounded p-2 text-xs text-white focus:border-emerald-500 outline-none sm:w-1/3"
+                          />
+                          <input 
+                            type="text" 
+                            placeholder="Describe la actividad clave..." 
+                            value={newTask.text}
+                            onChange={(e) => setNewTask({...newTask, text: e.target.value})}
+                            onKeyPress={(e) => e.key === 'Enter' && addTaskToDay(index)}
+                            className="flex-1 bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white focus:border-emerald-500 outline-none"
+                          />
+                          <button 
+                            onClick={() => addTaskToDay(index)}
+                            className="bg-emerald-600 hover:bg-emerald-500 text-white p-2 rounded transition-colors font-medium text-sm flex justify-center items-center gap-1"
+                          >
+                            Añadir
+                          </button>
+                        </div>
+                      </div>
+
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+
+      const renderFinances = () => (
+        <div className="space-y-6 animate-in">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700">
+              <div className="flex items-center gap-2 text-emerald-400 mb-2">
+                <TrendingUp className="w-5 h-5" /> <span className="font-semibold text-sm">Ingresos</span>
+              </div>
+              <p className="text-2xl font-bold text-white">${financeTotals.income.toLocaleString()}</p>
+            </div>
+            <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700">
+              <div className="flex items-center gap-2 text-red-400 mb-2">
+                <TrendingDown className="w-5 h-5" /> <span className="font-semibold text-sm">Egresos</span>
+              </div>
+              <p className="text-2xl font-bold text-white">${financeTotals.expense.toLocaleString()}</p>
+            </div>
+            <div className="col-span-2 md:col-span-1 bg-slate-800 p-4 rounded-2xl border border-slate-700">
+              <div className="flex items-center gap-2 text-blue-400 mb-2">
+                <DollarSign className="w-5 h-5" /> <span className="font-semibold text-sm">Balance</span>
+              </div>
+              <p className={`text-2xl font-bold ${financeTotals.income - financeTotals.expense >= 0 ? 'text-white' : 'text-red-400'}`}>
+                ${(financeTotals.income - financeTotals.expense).toLocaleString()}
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+            <h3 className="font-bold text-white mb-4">Registrar Movimiento</h3>
+            <form onSubmit={addTransaction} className="flex flex-col md:flex-row gap-4">
+              <select 
+                value={financeForm.type}
+                onChange={(e) => setFinanceForm({...financeForm, type: e.target.value})}
+                className="bg-slate-900 text-white border border-slate-700 rounded-lg p-3 outline-none focus:border-emerald-500"
+              >
+                <option value="ingreso">Ingreso (+)</option>
+                <option value="egreso">Egreso (-)</option>
+              </select>
+              <input 
+                type="number" 
+                placeholder="Monto ($)" 
+                value={financeForm.amount}
+                onChange={(e) => setFinanceForm({...financeForm, amount: e.target.value})}
+                className="flex-1 bg-slate-900 text-white border border-slate-700 rounded-lg p-3 outline-none focus:border-emerald-500"
+              />
+              <input 
+                type="text" 
+                placeholder="Descripción (ej. Sueldo, Almuerzo)" 
+                value={financeForm.description}
+                onChange={(e) => setFinanceForm({...financeForm, description: e.target.value})}
+                className="flex-[2] bg-slate-900 text-white border border-slate-700 rounded-lg p-3 outline-none focus:border-emerald-500"
+              />
+              <button type="submit" className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-3 rounded-lg font-semibold transition-colors">
+                Añadir
+              </button>
+            </form>
+          </div>
+
+          <div className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden">
+            <h3 className="font-bold text-white p-4 border-b border-slate-700 bg-slate-800/50">Historial Reciente</h3>
+            <div className="divide-y divide-slate-700/50">
+              {finances.length === 0 ? (
+                <p className="p-6 text-center text-slate-500">No hay movimientos registrados aún.</p>
+              ) : (
+                finances.slice().reverse().map(item => (
+                  <div key={item.id} className="flex justify-between items-center p-4 hover:bg-slate-700/30">
+                    <div>
+                      <p className="text-slate-200 font-medium">{item.description}</p>
+                      <p className="text-xs text-slate-500">{item.date}</p>
+                    </div>
+                    <div className={`font-bold ${item.type === 'ingreso' ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {item.type === 'ingreso' ? '+' : '-'}${item.amount.toLocaleString()}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      );
+
+      const renderHealth = () => (
+        <div className="space-y-6 animate-in">
+          <div className="bg-rose-900/30 p-6 rounded-2xl border border-rose-800/50 text-center">
+            <Activity className="w-12 h-12 text-rose-400 mx-auto mb-3" />
+            <h2 className="text-2xl font-bold text-white">Control Colon Irritable</h2>
+            <p className="text-rose-200/70 text-sm mt-2">Registra tus comidas y síntomas para encontrar patrones.</p>
+          </div>
+
+          <form onSubmit={addHealthLog} className="bg-slate-800 p-5 rounded-2xl border border-slate-700 space-y-4">
+            <div>
+              <label className="block text-slate-400 text-sm mb-1">¿Qué comiste?</label>
+              <input 
+                type="text" 
+                placeholder="Ej. Avena con leche de almendras" 
+                value={healthForm.meal}
+                onChange={(e) => setHealthForm({...healthForm, meal: e.target.value})}
+                className="w-full bg-slate-900 text-white border border-slate-700 rounded-lg p-3 outline-none focus:border-rose-500"
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-slate-400 text-sm mb-1">Síntomas presentados</label>
+                <select 
+                  value={healthForm.symptoms}
+                  onChange={(e) => setHealthForm({...healthForm, symptoms: e.target.value})}
+                  className="w-full bg-slate-900 text-white border border-slate-700 rounded-lg p-3 outline-none focus:border-rose-500"
+                >
+                  <option value="Ninguno">Ninguno (Me siento bien)</option>
+                  <option value="Inflamación leve">Inflamación leve</option>
+                  <option value="Inflamación severa">Inflamación severa</option>
+                  <option value="Dolor abdominal">Dolor abdominal</option>
+                  <option value="Gases">Gases / Pesadez</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-slate-400 text-sm mb-1">Nivel de molestia (1-5)</label>
+                <input 
+                  type="range" min="1" max="5" 
+                  value={healthForm.painLevel}
+                  onChange={(e) => setHealthForm({...healthForm, painLevel: parseInt(e.target.value)})}
+                  className="w-full mt-3 accent-rose-500"
+                />
+                <div className="flex justify-between text-xs text-slate-500 mt-1">
+                  <span>1 (Nada)</span> <span>5 (Mucho)</span>
+                </div>
+              </div>
+            </div>
+            <button type="submit" className="w-full bg-rose-600 hover:bg-rose-500 text-white py-3 rounded-lg font-semibold transition-colors">
+              Guardar Registro
+            </button>
+          </form>
+
+          <div className="space-y-3">
+            <h3 className="font-bold text-white px-1">Diario de Alimentación</h3>
+            {healthLogs.length === 0 ? (
+              <p className="text-center text-slate-500 py-4">No hay registros recientes.</p>
+            ) : (
+              healthLogs.map(log => (
+                <div key={log.id} className="bg-slate-800 p-4 rounded-xl border border-slate-700 flex flex-col md:flex-row md:justify-between md:items-center gap-2">
+                  <div>
+                    <p className="text-white font-medium">{log.meal}</p>
+                    <p className="text-xs text-slate-400">{log.date}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className={`text-xs px-2 py-1 rounded-full font-semibold ${log.symptoms === 'Ninguno' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-orange-500/20 text-orange-400'}`}>
+                      {log.symptoms}
+                    </span>
+                    <span className="text-xs text-slate-400 flex items-center gap-1">
+                      Nivel: <strong className={log.painLevel > 3 ? 'text-rose-400' : 'text-slate-200'}>{log.painLevel}/5</strong>
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      );
+
+      const renderGym = () => (
+        <div className="space-y-6 animate-in">
+          <div className="bg-slate-800 p-6 rounded-2xl shadow-lg border border-slate-700">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                <Dumbbell className="text-indigo-500" />
+                Progreso Semanal
+              </h2>
+              <span className="text-2xl font-bold text-indigo-400">{gymProgress}%</span>
+            </div>
+            <div className="w-full bg-slate-900 rounded-full h-4 mb-2 overflow-hidden border border-slate-700">
+              <div 
+                className="bg-indigo-500 h-4 rounded-full transition-all duration-1000"
+                style={{ width: `${gymProgress}%` }}
+              ></div>
+            </div>
+            <p className="text-xs text-slate-400 text-right">Completado esta semana</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {gymRoutine.map((routine) => (
+              <div 
+                key={routine.id} 
+                onClick={() => toggleGymDay(routine.id)}
+                className={`cursor-pointer p-5 rounded-2xl border transition-all duration-300 ${
+                  routine.completed 
+                    ? 'bg-indigo-900/30 border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.15)]' 
+                    : 'bg-slate-800 border-slate-700 hover:border-slate-500'
+                }`}
+              >
+                <div className="flex justify-between items-start mb-3">
+                  <span className={`font-bold text-lg ${routine.completed ? 'text-indigo-400' : 'text-white'}`}>
+                    {routine.day}
+                  </span>
+                  {routine.completed ? (
+                    <CheckCircle2 className="w-6 h-6 text-indigo-400" />
+                  ) : (
+                    <Circle className="w-6 h-6 text-slate-500" />
+                  )}
+                </div>
+                <p className={`text-sm ${routine.completed ? 'text-indigo-200' : 'text-slate-400'}`}>
+                  Enfoque: <strong className="font-semibold">{routine.focus}</strong>
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+
+      // ================= NAVEGACIÓN =================
+      const navItems = [
+        { id: 'habits', icon: CheckCircle2, label: 'Hábitos' },
+        { id: 'goals', icon: Target, label: 'Metas' },
+        { id: 'finances', icon: DollarSign, label: 'Finanzas' },
+        { id: 'health', icon: Activity, label: 'Salud' },
+        { id: 'gym', icon: Dumbbell, label: 'Gym' },
+      ];
+
+      return (
+        <div className="min-h-screen bg-slate-900 text-slate-200 font-sans pb-20 md:pb-0 md:pl-24">
+          <aside className="hidden md:flex flex-col w-24 fixed h-full left-0 top-0 bg-slate-950 border-r border-slate-800 items-center py-8 z-50">
+            <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-blue-500 rounded-xl flex items-center justify-center mb-10 shadow-lg shadow-emerald-500/20 text-white font-bold text-xl">
+              A
+            </div>
+            <nav className="flex flex-col gap-6 w-full">
+              {navItems.map(item => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveTab(item.id)}
+                    className={`flex flex-col items-center justify-center w-full py-3 relative group transition-colors ${isActive ? 'text-emerald-400' : 'text-slate-500 hover:text-slate-300'}`}
+                  >
+                    {isActive && <div className="absolute left-0 w-1 h-full bg-emerald-500 rounded-r-full" />}
+                    <Icon className="w-6 h-6 mb-1" />
+                    <span className="text-[10px] uppercase font-bold tracking-wider">{item.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+          </aside>
+
+          <main className="max-w-5xl mx-auto p-4 md:p-8">
+            <header className="mb-8 pt-4 md:pt-0">
+              <h1 className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-blue-500 mb-1">
+                Adventure
+              </h1>
+              <p className="text-slate-400 text-sm md:text-base">Tu centro de gestión personal e implacable.</p>
+            </header>
+
+            {activeTab === 'habits' && renderHabits()}
+            {activeTab === 'goals' && renderGoals()}
+            {activeTab === 'finances' && renderFinances()}
+            {activeTab === 'health' && renderHealth()}
+            {activeTab === 'gym' && renderGym()}
+          </main>
+
+          <nav className="md:hidden fixed bottom-0 w-full bg-slate-950 border-t border-slate-800 flex justify-around items-center h-16 px-2 z-50 pb-safe">
+            {navItems.map(item => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${isActive ? 'text-emerald-400' : 'text-slate-500'}`}
+                >
+                  <Icon className={`w-5 h-5 ${isActive ? 'scale-110' : ''} transition-transform`} />
+                  <span className="text-[9px] font-medium">{item.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+      );
+    }
+
+    // Renderizado en el DOM
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
