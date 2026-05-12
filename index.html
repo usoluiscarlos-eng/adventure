@@ -46,7 +46,7 @@
 <body>
   <div id="root"></div>
 
-  <!-- Script de Registro del Service Worker y Firebase -->
+  <!-- Script de Registro del Service Worker -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
@@ -55,27 +55,8 @@
     }
   </script>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, doc, setDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-    // Exponer Firebase al entorno global para que React (Babel) pueda usarlo
-    window.FirebaseUtils = {
-      initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged,
-      getFirestore, doc, setDoc, onSnapshot, collection
-    };
-    window.dispatchEvent(new Event('firebase-ready'));
-  </script>
-
   <script type="text/babel">
-    const { useState, useEffect, useMemo, useCallback, useRef } = React;
-
-    // --- INSTRUCCIONES PARA DESPLIEGUE EXTERNO (GITHUB PAGES) ---
-    // Esta plataforma de pruebas inyecta su propia base de datos temporalmente.
-    // Cuando subas este código a GitHub, necesitarás tu propia base de datos gratuita de Firebase.
-    // Reemplaza 'null' con tu objeto de configuración (ej. { apiKey: "XXX", projectId: "XXX", ... })
-    const EXTERNAL_FIREBASE_CONFIG = null;
+    const { useState, useEffect, useMemo, useCallback } = React;
 
     // --- ICONOS COMPATIBLES ---
     const IconWrapper = ({ children, className = "", ...props }) => (
@@ -141,152 +122,47 @@
     
     const getTodayString = () => getLocalString(new Date());
 
-    // --- ESTRUCTURA PRINCIPAL DE DATOS EN LA NUBE ---
-    const DEFAULT_DATA = {
-      habitsList: INITIAL_HABITS_TEMPLATE,
-      habitCompletions: {},
-      finances: [],
-      globalGoal: 'Lanzar mi emprendimiento principal este mes',
-      weeklyGoals: WEEK_DAYS.map(day => ({ day, dailyGoal: '', tasks: [] })),
-      healthLogs: [],
-      gymRoutine: [
+    // --- HOOK PERSONALIZADO DE LOCALSTORAGE (Sólido y Seguro) ---
+    function useLocalStorage(key, initialValue) {
+      const [storedValue, setStoredValue] = useState(() => {
+        try {
+          const item = window.localStorage.getItem(key);
+          return item ? JSON.parse(item) : initialValue;
+        } catch (error) {
+          console.error("Error cargando desde localStorage", error);
+          return initialValue;
+        }
+      });
+
+      useEffect(() => {
+        try {
+          window.localStorage.setItem(key, JSON.stringify(storedValue));
+        } catch (error) {
+          console.error("Error guardando en localStorage", error);
+        }
+      }, [key, storedValue]);
+
+      return [storedValue, setStoredValue];
+    }
+
+
+    function App() {
+      const [activeTab, setActiveTab] = useState('habits');
+
+      // --- ESTADOS CON PERSISTENCIA LOCAL ---
+      const [habitsList, setHabitsList] = useLocalStorage('adv_habitsList_v2', INITIAL_HABITS_TEMPLATE);
+      const [habitCompletions, setHabitCompletions] = useLocalStorage('adv_habitCompletions_v2', {});
+      const [finances, setFinances] = useLocalStorage('adv_finances_v2', []);
+      const [globalGoal, setGlobalGoal] = useLocalStorage('adv_globalGoal_v2', 'Lanzar mi emprendimiento principal este mes');
+      const [weeklyGoals, setWeeklyGoals] = useLocalStorage('adv_weeklyGoals_v2', WEEK_DAYS.map(day => ({ day, dailyGoal: '', tasks: [] })));
+      const [healthLogs, setHealthLogs] = useLocalStorage('adv_healthLogs_v2', []);
+      const [gymRoutine, setGymRoutine] = useLocalStorage('adv_gymRoutine_v2', [
         { id: 1, day: 'Lunes', focus: 'Pecho y Tríceps', completed: false },
         { id: 2, day: 'Martes', focus: 'Espalda y Bíceps', completed: false },
         { id: 3, day: 'Miércoles', focus: 'Pierna (Cuádriceps)', completed: false },
         { id: 4, day: 'Jueves', focus: 'Hombros y Abdomen', completed: false },
         { id: 5, day: 'Viernes', focus: 'Pierna (Femoral y Glúteo)', completed: false },
-      ]
-    };
-
-    function App() {
-      const [activeTab, setActiveTab] = useState('habits');
-      const [appData, setAppData] = useState(null); // Contiene todo el estado sincronizado
-      const [user, setUser] = useState(null);
-      const userRef = useRef(null);
-
-      // Sincronizar referencia de usuario
-      useEffect(() => { userRef.current = user; }, [user]);
-
-      // --- INICIALIZACIÓN DE FIREBASE ---
-      useEffect(() => {
-        const initFirebase = async () => {
-          try {
-            let firebaseConfigObj = null;
-            
-            // Detecta si está en el entorno de previsualización
-            if (typeof __firebase_config !== 'undefined') {
-               firebaseConfigObj = JSON.parse(__firebase_config);
-            } else if (EXTERNAL_FIREBASE_CONFIG) {
-               firebaseConfigObj = EXTERNAL_FIREBASE_CONFIG;
-            } else {
-               console.warn("Modo Offline activado: No hay configuración de base de datos.");
-               setAppData(DEFAULT_DATA);
-               return; // Si no hay config, arranca en modo local y se salta Firebase
-            }
-            
-            const app = window.FirebaseUtils.initializeApp(firebaseConfigObj);
-            const auth = window.FirebaseUtils.getAuth(app);
-            
-            const initAuth = async () => {
-              if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                await window.FirebaseUtils.signInWithCustomToken(auth, __initial_auth_token);
-              } else {
-                await window.FirebaseUtils.signInAnonymously(auth);
-              }
-            };
-            await initAuth();
-
-            window.FirebaseUtils.onAuthStateChanged(auth, (u) => {
-                setUser(u);
-            });
-          } catch (e) {
-            console.error("Error inicializando nube:", e);
-            setAppData(DEFAULT_DATA);
-          }
-        };
-
-        if (window.FirebaseUtils) {
-            initFirebase();
-        } else {
-            window.addEventListener('firebase-ready', initFirebase);
-            return () => window.removeEventListener('firebase-ready', initFirebase);
-        }
-      }, []);
-
-      // --- SUSCRIPCIÓN EN TIEMPO REAL (ESCUCHA DE LA NUBE) ---
-      useEffect(() => {
-        if (!user || (!EXTERNAL_FIREBASE_CONFIG && typeof __firebase_config === 'undefined')) return;
-        
-        const db = window.FirebaseUtils.getFirestore();
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'adventure-app';
-        const docRef = window.FirebaseUtils.doc(db, 'artifacts', appId, 'users', user.uid, 'appData', 'main');
-
-        const unsubscribe = window.FirebaseUtils.onSnapshot(docRef, (docSnap) => {
-            if (docSnap.exists()) {
-                setAppData({ ...DEFAULT_DATA, ...docSnap.data() });
-            } else {
-                setAppData(DEFAULT_DATA);
-                window.FirebaseUtils.setDoc(docRef, DEFAULT_DATA).catch(console.error);
-            }
-        }, (error) => {
-            console.error("Error al sincronizar datos:", error);
-        });
-
-        return () => unsubscribe();
-      }, [user]);
-
-      // --- GESTOR CENTRAL DE ACTUALIZACIONES (GUARDA EN LA NUBE) ---
-      const updateData = useCallback((field, updater) => {
-          setAppData(prevData => {
-              if (!prevData) return prevData;
-              const currentVal = prevData[field];
-              const newVal = typeof updater === 'function' ? updater(currentVal) : updater;
-              const newData = { ...prevData, [field]: newVal };
-
-              const currentUser = userRef.current;
-              const hasConfig = typeof __firebase_config !== 'undefined' || EXTERNAL_FIREBASE_CONFIG;
-              
-              if (currentUser && window.FirebaseUtils && hasConfig) {
-                   const db = window.FirebaseUtils.getFirestore();
-                   const appId = typeof __app_id !== 'undefined' ? __app_id : 'adventure-app';
-                   const docRef = window.FirebaseUtils.doc(db, 'artifacts', appId, 'users', currentUser.uid, 'appData', 'main');
-                   window.FirebaseUtils.setDoc(docRef, newData, { merge: true }).catch(console.error);
-              }
-              return newData;
-          });
-      }, []);
-
-      // Pantalla de Carga
-      if (!appData) {
-          return (
-             <div className="min-h-screen bg-slate-900 flex items-center justify-center flex-col gap-4">
-                 <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-                 <p className="text-emerald-500 font-medium tracking-wide">Sincronizando la Nube...</p>
-             </div>
-          );
-      }
-
-      // --- DISTRIBUCIÓN DEL ESTADO SINCRONIZADO ---
-      const habitsList = appData.habitsList;
-      const setHabitsList = (val) => updateData('habitsList', val);
-
-      const habitCompletions = appData.habitCompletions;
-      const setHabitCompletions = (val) => updateData('habitCompletions', val);
-
-      const finances = appData.finances;
-      const setFinances = (val) => updateData('finances', val);
-
-      const globalGoal = appData.globalGoal;
-      const setGlobalGoal = (val) => updateData('globalGoal', val);
-
-      const weeklyGoals = appData.weeklyGoals;
-      const setWeeklyGoals = (val) => updateData('weeklyGoals', val);
-
-      const healthLogs = appData.healthLogs;
-      const setHealthLogs = (val) => updateData('healthLogs', val);
-
-      const gymRoutine = appData.gymRoutine;
-      const setGymRoutine = (val) => updateData('gymRoutine', val);
+      ]);
 
 
       // --- ESTADOS LOCALES (INTERFAZ DE USUARIO TEMPORAL) ---
