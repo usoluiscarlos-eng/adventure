@@ -1,55 +1,40 @@
-const CACHE_NAME = 'adventure-cache-v1';
+// Cambia esto a v2 (o v3, v4 cada vez que hagas un cambio grande)
+const CACHE_NAME = 'adventure-v2'; 
 
 const urlsToCache = [
-  '/adventure/',
-  '/adventure/index.html',
-  '/adventure/manifest.json',
-  '/adventure/icon-192.png',
-  '/adventure/icon-512.png'
+  './index.html',
+  './manifest.json',
+  './icon-192.png',
+  './icon-512.png'
 ];
 
-// INSTALACIÓN
-self.addEventListener('install', (event) => {
-  console.log('Service Worker instalado');
-
+self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => {
-        return cache.addAll(urlsToCache);
-      })
+      .then(cache => cache.addAll(urlsToCache))
   );
-
+  // Fuerza al Service Worker a activarse inmediatamente
   self.skipWaiting();
 });
 
-// ACTIVACIÓN
-self.addEventListener('activate', (event) => {
-  console.log('Service Worker activado');
+self.addEventListener('fetch', event => {
+  event.respondWith(
+    caches.match(event.request)
+      .then(response => response || fetch(event.request))
+  );
+});
 
+// Borra los cachés viejos
+self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
+    caches.keys().then(cacheNames => {
       return Promise.all(
-        cacheNames.map((cache) => {
-          if (cache !== CACHE_NAME) {
-            return caches.delete(cache);
+        cacheNames.map(cacheName => {
+          if (cacheName !== CACHE_NAME) {
+            return caches.delete(cacheName);
           }
         })
       );
     })
-  );
-
-  self.clients.claim();
-});
-
-// FETCH
-self.addEventListener('fetch', (event) => {
-  event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        return response || fetch(event.request);
-      })
-      .catch(() => {
-        return caches.match('/adventure/index.html');
-      })
   );
 });
