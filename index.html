@@ -92,6 +92,7 @@
     const Landmark = (p) => <IconWrapper {...p}><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></IconWrapper>;
     const Smartphone = (p) => <IconWrapper {...p}><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></IconWrapper>;
     const ArrowRightLeft = (p) => <IconWrapper {...p}><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></IconWrapper>;
+    const Heart = (p) => <IconWrapper {...p}><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></IconWrapper>;
 
     const CATEGORIES = {
       'salud': { label: 'Salud', color: 'text-rose-400', bg: 'bg-rose-500/20', bar: 'bg-rose-500' },
@@ -102,7 +103,6 @@
       'desarrollo': { label: 'Desarrollo', color: 'text-purple-400', bg: 'bg-purple-500/20', bar: 'bg-purple-500' }
     };
 
-    // --- NUEVAS CATEGORÍAS FINANCIERAS ---
     const FINANCE_CATEGORIES = {
       ingreso: [
         { id: 'fijo', label: 'Ingreso Fijo (Salario)' },
@@ -170,23 +170,25 @@
 
 
     function App() {
-      const [activeTab, setActiveTab] = useState('finances');
+      const [activeTab, setActiveTab] = useState('gym');
 
       // --- ESTADOS CON PERSISTENCIA LOCAL ---
       const [habitsList, setHabitsList] = useLocalStorage('adv_habitsList_v2', INITIAL_HABITS_TEMPLATE);
       const [habitCompletions, setHabitCompletions] = useLocalStorage('adv_habitCompletions_v2', {});
-      const [finances, setFinances] = useLocalStorage('adv_finances_v4', []); // Actualizado a v4 para nuevas categorías
+      const [finances, setFinances] = useLocalStorage('adv_finances_v4', []); 
       const [globalGoal, setGlobalGoal] = useLocalStorage('adv_globalGoal_v2', 'Lanzar mi emprendimiento principal este mes');
       const [weeklyGoals, setWeeklyGoals] = useLocalStorage('adv_weeklyGoals_v2', WEEK_DAYS.map(day => ({ day, dailyGoal: '', tasks: [] })));
       const [healthLogs, setHealthLogs] = useLocalStorage('adv_healthLogs_v2', []);
-      const [gymRoutine, setGymRoutine] = useLocalStorage('adv_gymRoutine_v2', [
-        { id: 1, day: 'Lunes', focus: 'Pecho y Tríceps', completed: false },
-        { id: 2, day: 'Martes', focus: 'Espalda y Bíceps', completed: false },
-        { id: 3, day: 'Miércoles', focus: 'Pierna (Cuádriceps)', completed: false },
-        { id: 4, day: 'Jueves', focus: 'Hombros y Abdomen', completed: false },
-        { id: 5, day: 'Viernes', focus: 'Pierna (Femoral y Glúteo)', completed: false },
+      const [gymRoutine, setGymRoutine] = useLocalStorage('adv_gymRoutine_v3', [
+        { id: 1, day: 'Lunes', focus: 'Pecho y Tríceps', duration: 60, cardio: false, isCardioDone: false, completed: false },
+        { id: 2, day: 'Martes', focus: 'Espalda y Bíceps', duration: 60, cardio: false, isCardioDone: false, completed: false },
+        { id: 3, day: 'Miércoles', focus: 'Pierna (Cuádriceps)', duration: 60, cardio: false, isCardioDone: false, completed: false },
+        { id: 4, day: 'Jueves', focus: 'Hombros y Abdomen', duration: 45, cardio: true, isCardioDone: false, completed: false },
+        { id: 5, day: 'Viernes', focus: 'Pierna (Femoral)', duration: 60, cardio: false, isCardioDone: false, completed: false },
+        { id: 6, day: 'Sábado', focus: 'Cardio HIIT', duration: 30, cardio: true, isCardioDone: false, completed: false },
+        { id: 7, day: 'Domingo', focus: 'Descanso Total', duration: 0, cardio: false, isCardioDone: false, completed: false },
       ]);
-
+      const [bodyMetrics, setBodyMetrics] = useLocalStorage('adv_bodyMetrics_v1', { weight: '', height: '' });
 
       // --- ESTADOS LOCALES (INTERFAZ) ---
       const [selectedDate, setSelectedDate] = useState(getTodayString());
@@ -197,15 +199,16 @@
       const [newTask, setNewTask] = useState({ text: '', time: '' });
       const [healthForm, setHealthForm] = useState({ meal: '', symptoms: 'Ninguno', painLevel: 1 });
 
-      // ESTADOS LOCALES (FINANZAS BINANCE STYLE)
-      const [financeFilter, setFinanceFilter] = useState('mes'); // 'semana', 'quincena', 'mes', 'todo'
-      
-      // Ajustado el formulario para incluir Categoría y Cuenta Destino (para transferencias)
+      const [financeFilter, setFinanceFilter] = useState('mes'); 
       const [financeForm, setFinanceForm] = useState({ 
         id: null, type: 'egreso', amount: '', description: '', 
         account: 'nequi', toAccount: 'nubank', category: 'variable', date: getTodayString() 
       });
 
+      // Nuevo Estado para Edición de Gym
+      const [isEditingGym, setIsEditingGym] = useState(false);
+      const [newRoutine, setNewRoutine] = useState({ day: 'Lunes', focus: '', duration: 60 });
+      const [cardioPrompt, setCardioPrompt] = useState({ isOpen: false, routineId: null });
 
       // ================= LÓGICA DE HÁBITOS =================
       const validHabitIds = useMemo(() => new Set(habitsList.map(h => h.id)), [habitsList]);
@@ -307,7 +310,7 @@
           stats.streaks[h.id] = streak;
         });
         return stats;
-      }, [habitsList, habitCompletions, selectedDate]);
+      }, [habitsList, habitCompletions, selectedDate, validHabitIds]);
 
 
       // ================= LÓGICA DE METAS Y SALUD =================
@@ -336,110 +339,139 @@
         setHealthLogs([{ id: Date.now(), date: new Date().toLocaleString(), ...healthForm }, ...healthLogs]);
         setHealthForm({ meal: '', symptoms: 'Ninguno', painLevel: 1 });
       };
-      const toggleGymDay = (id) => setGymRoutine(gymRoutine.map(g => g.id === id ? { ...g, completed: !g.completed } : g));
-      const gymProgress = useMemo(() => Math.round((gymRoutine.filter(g => g.completed).length / gymRoutine.length) * 100) || 0, [gymRoutine]);
+      
+      // ================= LÓGICA DE GYM AVANZADA =================
+      const toggleGymDay = (id) => {
+        const routine = gymRoutine.find(g => g.id === id);
+        if (!routine.completed) {
+          setCardioPrompt({ isOpen: true, routineId: id });
+        } else {
+          setGymRoutine(gymRoutine.map(g => g.id === id ? { ...g, completed: false, isCardioDone: false } : g));
+        }
+      };
+
+      const handleCardioResponse = (didCardio) => {
+        setGymRoutine(gymRoutine.map(g => 
+          g.id === cardioPrompt.routineId ? { ...g, completed: true, isCardioDone: didCardio } : g
+        ));
+        setCardioPrompt({ isOpen: false, routineId: null });
+      };
+      
+      const handleUpdateGymRoutine = (id, field, value) => {
+        setGymRoutine(gymRoutine.map(g => g.id === id ? { ...g, [field]: value } : g));
+      };
+
+      const handleAddRoutine = () => {
+        if (!newRoutine.focus.trim()) return;
+        setGymRoutine([...gymRoutine, { id: Date.now(), ...newRoutine, isCardioDone: false, completed: false }]);
+        setNewRoutine({ day: 'Lunes', focus: '', duration: 60 });
+      };
+
+      const handleDeleteRoutine = (id) => {
+        setGymRoutine(gymRoutine.filter(g => g.id !== id));
+      };
+
+      const gymAnalytics = useMemo(() => {
+        let vitalityPoints = 0;
+        let completedCount = 0;
+        const muscleCounts = {};
+        
+        gymRoutine.forEach(r => {
+          if (r.completed) {
+            completedCount++;
+            vitalityPoints += 10; // 10 puntos por rutina cumplida
+            if (r.isCardioDone) vitalityPoints += 5; // 5 extra por cardio completado
+
+            // Algoritmo básico para identificar el músculo más trabajado
+            const muscles = r.focus.split(/ y |,| \/ | /).map(m => m.trim().toLowerCase()).filter(m => m.length > 3 && !['rutina','descanso','total','hiit'].includes(m));
+            muscles.forEach(m => {
+              muscleCounts[m] = (muscleCounts[m] || 0) + 1;
+            });
+          }
+        });
+
+        let topMuscle = 'N/A';
+        let maxCount = 0;
+        Object.keys(muscleCounts).forEach(m => {
+          if (muscleCounts[m] > maxCount) {
+            maxCount = muscleCounts[m];
+            topMuscle = m.charAt(0).toUpperCase() + m.slice(1);
+          }
+        });
+
+        const progress = gymRoutine.length > 0 ? Math.round((completedCount / gymRoutine.length) * 100) : 0;
+        
+        let mic = 0;
+        let micStatus = { text: '', color: '' };
+        if (bodyMetrics.weight && bodyMetrics.height) {
+          const w = parseFloat(bodyMetrics.weight);
+          const h = parseFloat(bodyMetrics.height);
+          if (h > 0) {
+            mic = (w / (h * h)).toFixed(1);
+            const micNum = parseFloat(mic);
+            if (micNum < 18.5) {
+              micStatus = { text: 'Bajo peso', color: 'text-blue-400' };
+            } else if (micNum >= 18.5 && micNum <= 24.9) {
+              micStatus = { text: 'Óptimo', color: 'text-emerald-400' };
+            } else if (micNum >= 25 && micNum <= 29.9) {
+              micStatus = { text: 'Leve sobrepeso', color: 'text-yellow-400' };
+            } else {
+              micStatus = { text: 'Sobrepeso / Obesidad', color: 'text-red-400' };
+            }
+          }
+        }
+
+        return { vitalityPoints, topMuscle, progress, mic, micStatus };
+      }, [gymRoutine, bodyMetrics]);
 
 
-      // ================= LÓGICA DE FINANZAS (BINANCE STYLE + SPREADSHEET) =================
+      // ================= LÓGICA DE FINANZAS =================
       const financeData = useMemo(() => {
-        // Bases iniciales establecidas (Tu capital base en Nubank)
         const balances = { nubank: 2360000, nequi: 0, efectivo: 0 };
-        
-        let totalIngresosFiltrados = 0;
-        let totalEgresosFiltrados = 0;
-        
+        let totalIngresosFiltrados = 0; let totalEgresosFiltrados = 0;
         let ingresosFijos = 0, ingresosVariables = 0;
         let gastosFijos = 0, gastosVariables = 0, ahorroRegistrado = 0;
 
-        // 1. Calcular Balances Reales (Todo el histórico acumulado)
         finances.forEach(t => {
            const acc = t.account || 'efectivo';
            if (t.type === 'ingreso') balances[acc] += t.amount;
            else if (t.type === 'egreso') balances[acc] -= t.amount;
-           else if (t.type === 'transferencia') {
-               balances[acc] -= t.amount;
-               if (t.toAccount) balances[t.toAccount] += t.amount;
-           }
+           else if (t.type === 'transferencia') { balances[acc] -= t.amount; if (t.toAccount) balances[t.toAccount] += t.amount; }
         });
 
-        // 2. Aplicar Filtro de Tiempo para las Analíticas
-        const today = new Date();
-        let limitDate = new Date(0); // Todo
+        const today = new Date(); let limitDate = new Date(0);
         if (financeFilter === 'semana') limitDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 7);
         else if (financeFilter === 'quincena') limitDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 15);
         else if (financeFilter === 'mes') limitDate = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
 
         const filteredList = finances.filter(t => new Date(t.date || new Date()) >= limitDate).sort((a,b) => new Date(b.date) - new Date(a.date));
 
-        // 3. Generar métricas de la Hoja de Cálculo
         filteredList.forEach(t => {
-           // Fallback para datos viejos
            const cat = t.category || (t.type === 'ingreso' ? 'variable' : 'variable');
-           
-           if (t.type === 'ingreso') {
-               totalIngresosFiltrados += t.amount;
-               if (cat === 'fijo') ingresosFijos += t.amount;
-               else ingresosVariables += t.amount;
-           } 
-           else if (t.type === 'egreso') {
-               totalEgresosFiltrados += t.amount;
-               if (cat === 'fijo') gastosFijos += t.amount;
-               else if (cat === 'ahorro') ahorroRegistrado += t.amount;
-               else gastosVariables += t.amount;
-           }
-           // Las transferencias puras no afectan el cuadro de P&L de la hoja de cálculo
+           if (t.type === 'ingreso') { totalIngresosFiltrados += t.amount; if (cat === 'fijo') ingresosFijos += t.amount; else ingresosVariables += t.amount; } 
+           else if (t.type === 'egreso') { totalEgresosFiltrados += t.amount; if (cat === 'fijo') gastosFijos += t.amount; else if (cat === 'ahorro') ahorroRegistrado += t.amount; else gastosVariables += t.amount; }
         });
 
         const totalBalance = balances.nubank + balances.nequi + balances.efectivo;
-        
-        // Libre Aproximado (Fórmula de tu Excel: Total Ingresos - Gastos - Ahorro destinado)
         const libreTotal = (ingresosFijos + ingresosVariables) - (gastosFijos + gastosVariables + ahorroRegistrado);
-        
-        // Rendimiento NuBank (9.25% E.A -> Aprox 0.74% Mensual)
         const monthlyYieldRate = Math.pow(1 + 0.0925, 1/12) - 1;
         const estimatedMonthlyYield = balances.nubank * monthlyYieldRate;
 
-        return { 
-          balances, totalBalance, totalIngresos: totalIngresosFiltrados, totalEgresos: totalEgresosFiltrados, 
-          filteredList, estimatedMonthlyYield,
-          ingresosFijos, ingresosVariables, gastosFijos, gastosVariables, ahorroRegistrado, libreTotal
-        };
+        return { balances, totalBalance, totalIngresos: totalIngresosFiltrados, totalEgresos: totalEgresosFiltrados, filteredList, estimatedMonthlyYield, ingresosFijos, ingresosVariables, gastosFijos, gastosVariables, ahorroRegistrado, libreTotal };
       }, [finances, financeFilter]);
 
       const handleAddOrEditTransaction = (e) => {
-        e.preventDefault();
-        if (!financeForm.amount || !financeForm.description) return;
+        e.preventDefault(); if (!financeForm.amount || !financeForm.description) return;
         const amountNum = parseFloat(financeForm.amount);
-        
-        // Si no es transferencia, asegurar que no lleve toAccount fantasma para evitar ruido
         const finalForm = { ...financeForm, amount: amountNum };
         if (finalForm.type !== 'transferencia') finalForm.toAccount = null;
-
-        if (financeForm.id) {
-          // Editando
-          setFinances(finances.map(f => f.id === financeForm.id ? finalForm : f));
-        } else {
-          // Creando nuevo
-          setFinances([{ ...finalForm, id: Date.now() }, ...finances]);
-        }
-        
-        // Reset Form
-        setFinanceForm({ 
-          id: null, type: 'egreso', amount: '', description: '', 
-          account: 'nequi', toAccount: 'nubank', category: 'variable', date: getTodayString() 
-        });
+        if (financeForm.id) setFinances(finances.map(f => f.id === financeForm.id ? finalForm : f));
+        else setFinances([{ ...finalForm, id: Date.now() }, ...finances]);
+        setFinanceForm({ id: null, type: 'egreso', amount: '', description: '', account: 'nequi', toAccount: 'nubank', category: 'variable', date: getTodayString() });
       };
 
-      const handleEditTransactionClick = (item) => {
-        setFinanceForm({...item, toAccount: item.toAccount || 'nubank', category: item.category || 'variable'});
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      };
-
-      const handleDeleteTransaction = (id) => {
-        if(confirm("¿Estás seguro de eliminar este movimiento?")) {
-          setFinances(finances.filter(f => f.id !== id));
-        }
-      };
+      const handleEditTransactionClick = (item) => { setFinanceForm({...item, toAccount: item.toAccount || 'nubank', category: item.category || 'variable'}); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+      const handleDeleteTransaction = (id) => { if(confirm("¿Estás seguro de eliminar este movimiento?")) setFinances(finances.filter(f => f.id !== id)); };
 
 
       // ================= RENDERIZADO DE PESTAÑAS =================
@@ -959,27 +991,193 @@
 
       const renderGym = () => (
         <div className="space-y-6 animate-in fade-in">
-          <div className="bg-slate-800 p-6 rounded-2xl shadow-lg border border-slate-700">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold text-white flex items-center gap-2"><Dumbbell className="text-indigo-500" /> Progreso Semanal</h2>
-              <span className="text-2xl font-bold text-indigo-400">{gymProgress}%</span>
-            </div>
-            <div className="w-full bg-slate-900 rounded-full h-4 mb-2 overflow-hidden border border-slate-700">
-              <div className="bg-indigo-500 h-4 rounded-full transition-all duration-1000" style={{ width: `${gymProgress}%` }}></div>
-            </div>
-            <p className="text-xs text-slate-400 text-right">Completado esta semana</p>
+          
+          {/* Header Action Gym */}
+          <div className="flex flex-col sm:flex-row justify-between items-center bg-slate-800 p-4 rounded-2xl shadow-lg border border-slate-700 gap-4">
+             <div className="flex items-center gap-3">
+                <Dumbbell className="w-6 h-6 text-indigo-500" />
+                <h2 className="text-xl font-bold text-white">Panel de Entrenamiento</h2>
+             </div>
+             <button onClick={() => setIsEditingGym(!isEditingGym)} className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors w-full sm:w-auto justify-center ${isEditingGym ? 'bg-indigo-600 text-white' : 'bg-slate-700 hover:bg-slate-600 text-slate-200'}`}>
+              {isEditingGym ? <CheckCircle2 className="w-4 h-4" /> : <Settings className="w-4 h-4" />}
+              {isEditingGym ? 'Finalizar Edición' : 'Configurar Rutina'}
+            </button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {gymRoutine.map((routine) => (
-              <div key={routine.id} onClick={() => toggleGymDay(routine.id)} className={`cursor-pointer p-5 rounded-2xl border transition-all duration-300 ${routine.completed ? 'bg-indigo-900/30 border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.15)]' : 'bg-slate-800 border-slate-700 hover:border-slate-500'}`}>
-                <div className="flex justify-between items-start mb-3">
-                  <span className={`font-bold text-lg ${routine.completed ? 'text-indigo-400' : 'text-white'}`}>{routine.day}</span>
-                  {routine.completed ? <CheckCircle2 className="w-6 h-6 text-indigo-400" /> : <Circle className="w-6 h-6 text-slate-500" />}
-                </div>
-                <p className={`text-sm ${routine.completed ? 'text-indigo-200' : 'text-slate-400'}`}>Enfoque: <strong className="font-semibold">{routine.focus}</strong></p>
+
+          {/* Cards Analytics Gym */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700 flex flex-col justify-between">
+              <div className="flex justify-between items-start mb-2">
+                <span className="text-[10px] font-bold text-rose-400 uppercase tracking-wider">Puntos Vitalidad</span>
+                <Heart className="w-4 h-4 text-rose-500" />
               </div>
-            ))}
+              <div className="flex items-baseline gap-1 mt-2">
+                <span className="text-3xl font-extrabold text-white">{gymAnalytics.vitalityPoints}</span>
+                <span className="text-xs text-slate-400 mb-1">pts</span>
+              </div>
+              <p className="text-[9px] text-slate-500 mt-1">+10 por rutina / +5 extra cardio</p>
+            </div>
+
+            <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700 flex flex-col justify-between">
+              <div className="flex justify-between items-start mb-2">
+                <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">Músculo Estrella</span>
+                <Flame className="w-4 h-4 text-orange-500" />
+              </div>
+              <p className="text-lg font-bold text-white leading-tight mt-2">{gymAnalytics.topMuscle}</p>
+              <p className="text-[9px] text-slate-500 mt-1">Mayor frecuencia completada</p>
+            </div>
+
+            <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700 flex flex-col justify-between relative group">
+              <div className="flex justify-between items-start mb-2">
+                <span className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Calculadora MIC/IMC</span>
+                <Activity className="w-4 h-4 text-blue-500" />
+              </div>
+              
+              <div className="flex flex-col mt-1">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xl font-extrabold text-white">{gymAnalytics.mic > 0 ? gymAnalytics.mic : '--'}</span>
+                  {gymAnalytics.mic > 0 && (
+                    <span className={`text-[10px] uppercase font-bold tracking-wider ${gymAnalytics.micStatus.color}`}>
+                      {gymAnalytics.micStatus.text}
+                    </span>
+                  )}
+                </div>
+              </div>
+              
+              <div className="flex gap-2 mt-2">
+                <input 
+                  type="number" placeholder="Peso(Kg)" value={bodyMetrics.weight} 
+                  onChange={(e) => setBodyMetrics({...bodyMetrics, weight: e.target.value})}
+                  className="w-1/2 bg-slate-900 border border-slate-600 rounded px-1.5 py-1 text-xs text-white outline-none focus:border-blue-500"
+                />
+                <input 
+                  type="number" placeholder="Alt(m)" value={bodyMetrics.height} step="0.01"
+                  onChange={(e) => setBodyMetrics({...bodyMetrics, height: e.target.value})}
+                  className="w-1/2 bg-slate-900 border border-slate-600 rounded px-1.5 py-1 text-xs text-white outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+
+            <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700 flex flex-col justify-between">
+              <div className="flex justify-between items-start mb-2">
+                <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Progreso Semanal</span>
+                <Target className="w-4 h-4 text-emerald-500" />
+              </div>
+              <div className="flex items-baseline gap-1 mt-2">
+                <span className="text-3xl font-extrabold text-white">{gymAnalytics.progress}%</span>
+              </div>
+              <div className="w-full bg-slate-900 rounded-full h-1.5 mt-2">
+                <div className="bg-emerald-500 h-1.5 rounded-full transition-all duration-1000" style={{ width: `${gymAnalytics.progress}%` }}></div>
+              </div>
+            </div>
           </div>
+
+          {/* Rutina Principal */}
+          <div className="bg-slate-800 rounded-2xl shadow-lg border border-slate-700 overflow-hidden">
+            {isEditingGym ? (
+               <div className="p-5 overflow-x-auto min-w-[700px]">
+                  <table className="w-full text-left text-sm text-slate-300">
+                      <thead className="text-xs uppercase text-slate-400 border-b border-slate-700">
+                        <tr>
+                          <th className="pb-3 px-2 w-32">Día</th>
+                          <th className="pb-3 px-2">Enfoque (Músculo/Actividad)</th>
+                          <th className="pb-3 px-2 w-24">Minutos</th>
+                          <th className="pb-3 pl-2 w-10 text-center"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800">
+                        {gymRoutine.map((routine) => (
+                           <tr key={routine.id}>
+                             <td className="py-2 px-2">
+                               <select value={routine.day} onChange={(e) => handleUpdateGymRoutine(routine.id, 'day', e.target.value)} className="bg-slate-900 text-xs text-white border border-slate-600 rounded p-2 outline-none w-full">
+                                  {WEEK_DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+                               </select>
+                             </td>
+                             <td className="py-2 px-2">
+                                <input type="text" value={routine.focus} onChange={(e) => handleUpdateGymRoutine(routine.id, 'focus', e.target.value)} className="bg-slate-900 text-sm text-white border border-slate-600 rounded p-2 outline-none w-full focus:border-indigo-500" placeholder="Ej. Pecho y Tríceps" />
+                             </td>
+                             <td className="py-2 px-2">
+                                <input type="number" value={routine.duration} onChange={(e) => handleUpdateGymRoutine(routine.id, 'duration', parseInt(e.target.value) || 0)} className="bg-slate-900 text-sm text-white border border-slate-600 rounded p-2 outline-none w-full focus:border-indigo-500 text-center" />
+                             </td>
+                             <td className="py-2 pl-2">
+                                <button onClick={() => handleDeleteRoutine(routine.id)} className="bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white p-2 rounded w-full flex justify-center"><Trash2 className="w-4 h-4" /></button>
+                             </td>
+                           </tr>
+                        ))}
+                      </tbody>
+                  </table>
+                  
+                  <div className="border-t border-slate-700 pt-4 mt-2">
+                      <h4 className="text-sm font-semibold text-indigo-400 mb-3 flex items-center gap-1"><Plus className="w-4 h-4" /> Agregar Día de Entrenamiento</h4>
+                      <div className="flex gap-2 items-center">
+                        <select value={newRoutine.day} onChange={(e) => setNewRoutine({...newRoutine, day: e.target.value})} className="bg-slate-900 text-xs text-white border border-slate-600 rounded p-2 outline-none w-32 focus:border-indigo-500">
+                            {WEEK_DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+                        </select>
+                        <input type="text" value={newRoutine.focus} onChange={(e) => setNewRoutine({...newRoutine, focus: e.target.value})} placeholder="Enfoque muscular..." onKeyPress={(e) => e.key === 'Enter' && handleAddRoutine()} className="bg-slate-900 text-sm text-white border border-slate-600 rounded p-2 outline-none flex-1 focus:border-indigo-500" />
+                        <input type="number" value={newRoutine.duration} onChange={(e) => setNewRoutine({...newRoutine, duration: parseInt(e.target.value) || 0})} placeholder="Min" className="bg-slate-900 text-sm text-white border border-slate-600 rounded p-2 outline-none w-20 text-center focus:border-indigo-500" />
+                        <button onClick={handleAddRoutine} className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-500 font-medium">Añadir</button>
+                      </div>
+                  </div>
+               </div>
+            ) : (
+               <div className="divide-y divide-slate-700/50">
+                {gymRoutine.length === 0 ? (
+                   <p className="p-8 text-center text-slate-500">No tienes rutinas configuradas.</p>
+                ) : (
+                  gymRoutine.map((routine) => (
+                    <div key={routine.id} className={`p-4 transition-all duration-300 ${routine.completed ? 'bg-indigo-900/10' : 'hover:bg-slate-700/30'}`}>
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        
+                        <div className="flex items-center gap-4 flex-1">
+                          <button onClick={() => toggleGymDay(routine.id)} className="focus:outline-none shrink-0">
+                            {routine.completed ? <CheckCircle2 className="w-8 h-8 text-indigo-500 transition-transform scale-110" /> : <Circle className="w-8 h-8 text-slate-600 hover:text-indigo-400" />}
+                          </button>
+                          <div>
+                             <p className={`font-bold text-lg ${routine.completed ? 'text-slate-400 line-through' : 'text-white'}`}>{routine.day}</p>
+                             <p className="text-sm text-indigo-300 font-medium">{routine.focus}</p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex flex-wrap items-center gap-4 pl-12 md:pl-0">
+                           <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300">
+                              <Clock className="w-4 h-4 text-slate-400" /> {routine.duration} min
+                           </div>
+                           
+                           {routine.isCardioDone && (
+                              <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border bg-rose-500/20 border-rose-500/50 text-rose-400">
+                                 <Heart className="w-4 h-4" /> Cardio +5
+                              </span>
+                           )}
+                        </div>
+
+                      </div>
+                    </div>
+                  ))
+                )}
+               </div>
+            )}
+          </div>
+
+          {/* Modal Flotante para Confirmar Cardio */}
+          {cardioPrompt.isOpen && (
+            <div className="fixed inset-0 bg-slate-950/80 z-[100] flex items-center justify-center p-4 animate-in fade-in">
+              <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-2xl max-w-sm w-full text-center">
+                <div className="w-16 h-16 bg-rose-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Heart className="w-8 h-8 text-rose-500" />
+                </div>
+                <h3 className="text-xl font-bold text-white mb-2">¡Rutina Completada!</h3>
+                <p className="text-sm text-slate-400 mb-6">¿Realizaste el complemento de cardio? Esto sumará +5 Puntos de Vitalidad a tu racha de hoy.</p>
+                <div className="flex gap-3">
+                  <button onClick={() => handleCardioResponse(false)} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-3 rounded-lg font-semibold transition-colors">
+                    No, solo pesas
+                  </button>
+                  <button onClick={() => handleCardioResponse(true)} className="flex-1 bg-rose-600 hover:bg-rose-500 text-white py-3 rounded-lg font-bold shadow-lg shadow-rose-500/20 transition-colors">
+                    ¡Sí, con toda!
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       );
 
