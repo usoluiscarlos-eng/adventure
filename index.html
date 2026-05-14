@@ -1,18 +1,13 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <link rel="manifest" href="./manifest.json">
-<meta name="theme-color" content="#10b981">
-
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Adventure - Gestión Personal</title>
 
   <!-- Etiquetas PWA -->
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#10b981">
+  <meta name="theme-color" content="#0f172a">
   <link rel="apple-touch-icon" href="icon-192.png">
 
   <!-- Tailwind CSS -->
@@ -42,7 +37,8 @@
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
     ::-webkit-scrollbar-thumb:hover { background: #475569; }
-    input[type="time"]::-webkit-calendar-picker-indicator {
+    input[type="time"]::-webkit-calendar-picker-indicator,
+    input[type="date"]::-webkit-calendar-picker-indicator {
       filter: invert(1);
       cursor: pointer;
     }
@@ -87,11 +83,14 @@
     const ChevronUp = (p) => <IconWrapper {...p}><path d="m18 15-6-6-6 6"/></IconWrapper>;
     const Clock = (p) => <IconWrapper {...p}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></IconWrapper>;
     const BarChart = (p) => <IconWrapper {...p}><line x1="12" x2="12" y1="20" y2="10"/><line x1="18" x2="18" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="16"/></IconWrapper>;
-    
     const Flame = (p) => <IconWrapper {...p}><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></IconWrapper>;
     const Trophy = (p) => <IconWrapper {...p}><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></IconWrapper>;
     const Zap = (p) => <IconWrapper {...p}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></IconWrapper>;
     const AlertTriangle = (p) => <IconWrapper {...p}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></IconWrapper>;
+    const Edit2 = (p) => <IconWrapper {...p}><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></IconWrapper>;
+    const Wallet = (p) => <IconWrapper {...p}><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></IconWrapper>;
+    const Landmark = (p) => <IconWrapper {...p}><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></IconWrapper>;
+    const Smartphone = (p) => <IconWrapper {...p}><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></IconWrapper>;
 
     const CATEGORIES = {
       'salud': { label: 'Salud', color: 'text-rose-400', bg: 'bg-rose-500/20', bar: 'bg-rose-500' },
@@ -127,7 +126,11 @@
     
     const getTodayString = () => getLocalString(new Date());
 
-    // --- HOOK PERSONALIZADO DE LOCALSTORAGE (Sólido y Seguro) ---
+    const formatCurrency = (value) => {
+      return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value);
+    };
+
+    // --- HOOK PERSONALIZADO DE LOCALSTORAGE ---
     function useLocalStorage(key, initialValue) {
       const [storedValue, setStoredValue] = useState(() => {
         try {
@@ -152,12 +155,12 @@
 
 
     function App() {
-      const [activeTab, setActiveTab] = useState('habits');
+      const [activeTab, setActiveTab] = useState('finances');
 
       // --- ESTADOS CON PERSISTENCIA LOCAL ---
       const [habitsList, setHabitsList] = useLocalStorage('adv_habitsList_v2', INITIAL_HABITS_TEMPLATE);
       const [habitCompletions, setHabitCompletions] = useLocalStorage('adv_habitCompletions_v2', {});
-      const [finances, setFinances] = useLocalStorage('adv_finances_v2', []);
+      const [finances, setFinances] = useLocalStorage('adv_finances_v3', []); // v3 para la nueva estructura de cuentas
       const [globalGoal, setGlobalGoal] = useLocalStorage('adv_globalGoal_v2', 'Lanzar mi emprendimiento principal este mes');
       const [weeklyGoals, setWeeklyGoals] = useLocalStorage('adv_weeklyGoals_v2', WEEK_DAYS.map(day => ({ day, dailyGoal: '', tasks: [] })));
       const [healthLogs, setHealthLogs] = useLocalStorage('adv_healthLogs_v2', []);
@@ -170,18 +173,21 @@
       ]);
 
 
-      // --- ESTADOS LOCALES (INTERFAZ DE USUARIO TEMPORAL) ---
+      // --- ESTADOS LOCALES (INTERFAZ) ---
       const [selectedDate, setSelectedDate] = useState(getTodayString());
       const [isEditingHabits, setIsEditingHabits] = useState(false);
       const [newHabit, setNewHabit] = useState({ text: '', startTime: '', endTime: '', category: 'rutina' });
-      const [financeForm, setFinanceForm] = useState({ type: 'ingreso', amount: '', description: '' });
+      
       const [expandedDay, setExpandedDay] = useState('Lunes');
       const [newTask, setNewTask] = useState({ text: '', time: '' });
       const [healthForm, setHealthForm] = useState({ meal: '', symptoms: 'Ninguno', painLevel: 1 });
 
+      // ESTADOS LOCALES (FINANZAS BINANCE STYLE)
+      const [financeFilter, setFinanceFilter] = useState('mes'); // 'semana', 'quincena', 'mes', 'todo'
+      const [financeForm, setFinanceForm] = useState({ id: null, type: 'egreso', amount: '', description: '', account: 'nequi', date: getTodayString() });
 
-      // ================= LÓGICA AVANZADA DE HÁBITOS =================
-      // Identificar IDs válidos actuales para ignorar "fantasmas"
+
+      // ================= LÓGICA DE HÁBITOS =================
       const validHabitIds = useMemo(() => new Set(habitsList.map(h => h.id)), [habitsList]);
       const currentCompletedIds = (habitCompletions[selectedDate] || []).filter(id => validHabitIds.has(id));
 
@@ -191,26 +197,19 @@
           const isCompleted = dayCompletions.includes(id);
           return {
             ...prev,
-            [selectedDate]: isCompleted 
-              ? dayCompletions.filter(habitId => habitId !== id)
-              : [...dayCompletions, id]
+            [selectedDate]: isCompleted ? dayCompletions.filter(habitId => habitId !== id) : [...dayCompletions, id]
           };
         });
       };
 
-      const handleUpdateHabit = (id, field, value) => {
-        setHabitsList(habitsList.map(h => h.id === id ? { ...h, [field]: value } : h));
-      };
-
+      const handleUpdateHabit = (id, field, value) => setHabitsList(habitsList.map(h => h.id === id ? { ...h, [field]: value } : h));
+      
       const handleDeleteHabit = (id) => {
         setHabitsList(habitsList.filter(h => h.id !== id));
-        // Limpiar historial del hábito eliminado para evitar contadores atascados
         setHabitCompletions(prev => {
-          const updatedCompletions = { ...prev };
-          Object.keys(updatedCompletions).forEach(date => {
-            updatedCompletions[date] = updatedCompletions[date].filter(completedId => completedId !== id);
-          });
-          return updatedCompletions;
+          const updated = { ...prev };
+          Object.keys(updated).forEach(date => updated[date] = updated[date].filter(cId => cId !== id));
+          return updated;
         });
       };
 
@@ -220,54 +219,34 @@
         setNewHabit({ text: '', startTime: '', endTime: '', category: 'rutina' });
       };
 
-      // --- ANALÍTICAS DE HÁBITOS ---
       const habitAnalytics = useMemo(() => {
-        const stats = {
-          currentWeekScore: 0,
-          previousWeekScore: 0,
-          trend: 0,
-          strongestHabit: null,
-          weakestHabit: null,
-          categoryCompliance: {},
-          streaks: {},
-          trendData: []
-        };
-
+        const stats = { currentWeekScore: 0, previousWeekScore: 0, trend: 0, strongestHabit: null, weakestHabit: null, categoryCompliance: {}, streaks: {}, trendData: [] };
         if (habitsList.length === 0) return stats;
-
         const totalHabits = habitsList.length;
         const [year, month, day] = selectedDate.split('-').map(Number);
         const baseDate = new Date(year, month - 1, day);
-
         const habitCounts = {};
         habitsList.forEach(h => habitCounts[h.id] = 0);
 
         for (let i = 0; i < 30; i++) {
-          const d = new Date(baseDate);
-          d.setDate(d.getDate() - i);
+          const d = new Date(baseDate); d.setDate(d.getDate() - i);
           const dateStr = getLocalString(d);
           const completedToday = (habitCompletions[dateStr] || []).filter(id => validHabitIds.has(id));
-          completedToday.forEach(id => {
-            if(habitCounts[id] !== undefined) habitCounts[id]++;
-          });
+          completedToday.forEach(id => { if(habitCounts[id] !== undefined) habitCounts[id]++; });
         }
 
-        let maxCount = -1;
-        let minCount = 31;
+        let maxCount = -1, minCount = 31;
         habitsList.forEach(h => {
           const count = habitCounts[h.id];
           if (count > maxCount) { maxCount = count; stats.strongestHabit = h; }
           if (count < minCount) { minCount = count; stats.weakestHabit = h; }
         });
 
-        let currentWeekHits = 0;
-        let previousWeekHits = 0;
-        
+        let currentWeekHits = 0, previousWeekHits = 0;
         Object.keys(CATEGORIES).forEach(c => stats.categoryCompliance[c] = { hits: 0, total: 0 });
 
         for (let i = 0; i < 14; i++) {
-          const d = new Date(baseDate);
-          d.setDate(d.getDate() - i);
+          const d = new Date(baseDate); d.setDate(d.getDate() - i);
           const dateStr = getLocalString(d);
           const completedIds = (habitCompletions[dateStr] || []).filter(id => validHabitIds.has(id));
           const hits = completedIds.length;
@@ -275,10 +254,8 @@
           if (i < 7) {
             currentWeekHits += hits;
             stats.trendData.unshift({
-              date: dateStr,
-              dayName: d.toLocaleDateString('es-ES', { weekday: 'short' }),
-              percentage: Math.round((hits / totalHabits) * 100),
-              isSelected: dateStr === selectedDate
+              date: dateStr, dayName: d.toLocaleDateString('es-ES', { weekday: 'short' }),
+              percentage: Math.round((hits / totalHabits) * 100), isSelected: dateStr === selectedDate
             });
             habitsList.forEach(h => {
               if(stats.categoryCompliance[h.category]) {
@@ -286,14 +263,12 @@
                 if (completedIds.includes(h.id)) stats.categoryCompliance[h.category].hits++;
               }
             });
-          } else {
-            previousWeekHits += hits;
-          }
+          } else { previousWeekHits += hits; }
         }
 
         const possiblePerWeek = totalHabits * 7;
-        stats.currentWeekScore = Math.round((currentWeekHits / possiblePerWeek) * 100);
-        stats.previousWeekScore = Math.round((previousWeekHits / possiblePerWeek) * 100);
+        stats.currentWeekScore = Math.round((currentWeekHits / possiblePerWeek) * 100) || 0;
+        stats.previousWeekScore = Math.round((previousWeekHits / possiblePerWeek) * 100) || 0;
         stats.trend = stats.currentWeekScore - stats.previousWeekScore;
 
         Object.keys(stats.categoryCompliance).forEach(c => {
@@ -302,37 +277,25 @@
         });
 
         habitsList.forEach(h => {
-          let streak = 0;
-          let checkDate = new Date(baseDate);
-          
-          const todayCompleted = (habitCompletions[selectedDate] || []).includes(h.id);
-          if (!todayCompleted) {
-            checkDate.setDate(checkDate.getDate() - 1);
-          }
-
+          let streak = 0; let checkDate = new Date(baseDate);
+          if (!(habitCompletions[selectedDate] || []).includes(h.id)) checkDate.setDate(checkDate.getDate() - 1);
           while(true) {
-            const dateStr = getLocalString(checkDate);
-            if ((habitCompletions[dateStr] || []).includes(h.id)) {
-              streak++;
-              checkDate.setDate(checkDate.getDate() - 1);
-            } else {
-              break;
-            }
+            if ((habitCompletions[getLocalString(checkDate)] || []).includes(h.id)) {
+              streak++; checkDate.setDate(checkDate.getDate() - 1);
+            } else break;
           }
           stats.streaks[h.id] = streak;
         });
-
         return stats;
       }, [habitsList, habitCompletions, selectedDate]);
 
 
-      // ================= LÓGICA DE METAS Y RESTO =================
+      // ================= LÓGICA DE METAS Y SALUD =================
       const addTaskToDay = (dayIndex) => {
         if (!newTask.text.trim()) return;
         const updatedGoals = [...weeklyGoals];
         updatedGoals[dayIndex].tasks.push({ id: Date.now(), text: newTask.text, time: newTask.time, status: 'sin_empezar', is8020: true });
-        setWeeklyGoals(updatedGoals);
-        setNewTask({ text: '', time: '' });
+        setWeeklyGoals(updatedGoals); setNewTask({ text: '', time: '' });
       };
       const updateTaskStatus = (dayIndex, taskId, newStatus) => {
         const updatedGoals = [...weeklyGoals];
@@ -345,58 +308,92 @@
         setWeeklyGoals(updatedGoals);
       };
       const updateDailyGoal = (dayIndex, text) => {
-        const updatedGoals = [...weeklyGoals];
-        updatedGoals[dayIndex].dailyGoal = text;
-        setWeeklyGoals(updatedGoals);
+        const updatedGoals = [...weeklyGoals]; updatedGoals[dayIndex].dailyGoal = text; setWeeklyGoals(updatedGoals);
       };
-
-      const addTransaction = (e) => {
-        e.preventDefault();
-        if (!financeForm.amount || !financeForm.description) return;
-        setFinances([...finances, { id: Date.now(), ...financeForm, amount: parseFloat(financeForm.amount), date: new Date().toLocaleDateString() }]);
-        setFinanceForm({ type: 'ingreso', amount: '', description: '' });
-      };
-      const financeTotals = useMemo(() => {
-        return finances.reduce((acc, curr) => {
-          if (curr.type === 'ingreso') acc.income += curr.amount; else acc.expense += curr.amount;
-          return acc;
-        }, { income: 0, expense: 0 });
-      }, [finances]);
 
       const addHealthLog = (e) => {
-        e.preventDefault();
-        if (!healthForm.meal) return;
+        e.preventDefault(); if (!healthForm.meal) return;
         setHealthLogs([{ id: Date.now(), date: new Date().toLocaleString(), ...healthForm }, ...healthLogs]);
         setHealthForm({ meal: '', symptoms: 'Ninguno', painLevel: 1 });
       };
+      const toggleGymDay = (id) => setGymRoutine(gymRoutine.map(g => g.id === id ? { ...g, completed: !g.completed } : g));
+      const gymProgress = useMemo(() => Math.round((gymRoutine.filter(g => g.completed).length / gymRoutine.length) * 100) || 0, [gymRoutine]);
 
-      const toggleGymDay = (id) => {
-        setGymRoutine(gymRoutine.map(g => g.id === id ? { ...g, completed: !g.completed } : g));
+
+      // ================= LÓGICA DE FINANZAS (BINANCE STYLE) =================
+      const financeData = useMemo(() => {
+        // Bases iniciales establecidas
+        const balances = { nubank: 2360000, nequi: 0, efectivo: 0 };
+        let totalIngresosFiltrados = 0;
+        let totalEgresosFiltrados = 0;
+
+        // 1. Calcular Balances Reales (Todo el histórico)
+        finances.forEach(t => {
+           const acc = t.account || 'efectivo'; // Fallback por si hay datos viejos
+           if (t.type === 'ingreso') balances[acc] += t.amount;
+           else balances[acc] -= t.amount;
+        });
+
+        // 2. Aplicar Filtro de Tiempo para Ingresos/Egresos y Lista
+        const today = new Date();
+        let limitDate = new Date(0); // Todo
+        if (financeFilter === 'semana') limitDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 7);
+        else if (financeFilter === 'quincena') limitDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 15);
+        else if (financeFilter === 'mes') limitDate = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
+
+        const filteredList = finances.filter(t => new Date(t.date || new Date()) >= limitDate).sort((a,b) => new Date(b.date) - new Date(a.date));
+
+        filteredList.forEach(t => {
+           if (t.type === 'ingreso') totalIngresosFiltrados += t.amount;
+           else totalEgresosFiltrados += t.amount;
+        });
+
+        const totalBalance = balances.nubank + balances.nequi + balances.efectivo;
+        
+        // Rendimiento NuBank (9.25% E.A -> Aprox 0.74% Mensual)
+        const monthlyYieldRate = Math.pow(1 + 0.0925, 1/12) - 1;
+        const estimatedMonthlyYield = balances.nubank * monthlyYieldRate;
+
+        return { balances, totalBalance, totalIngresos: totalIngresosFiltrados, totalEgresos: totalEgresosFiltrados, filteredList, estimatedMonthlyYield };
+      }, [finances, financeFilter]);
+
+      const handleAddOrEditTransaction = (e) => {
+        e.preventDefault();
+        if (!financeForm.amount || !financeForm.description) return;
+        const amountNum = parseFloat(financeForm.amount);
+        
+        if (financeForm.id) {
+          // Editando
+          setFinances(finances.map(f => f.id === financeForm.id ? { ...financeForm, amount: amountNum } : f));
+        } else {
+          // Creando nuevo
+          setFinances([{ ...financeForm, id: Date.now(), amount: amountNum }, ...finances]);
+        }
+        // Limpiar formulario
+        setFinanceForm({ id: null, type: 'egreso', amount: '', description: '', account: 'nequi', date: getTodayString() });
       };
-      const gymProgress = useMemo(() => {
-        const completed = gymRoutine.filter(g => g.completed).length;
-        return Math.round((completed / gymRoutine.length) * 100) || 0;
-      }, [gymRoutine]);
+
+      const handleEditTransactionClick = (item) => {
+        setFinanceForm(item);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      };
+
+      const handleDeleteTransaction = (id) => {
+        if(confirm("¿Estás seguro de eliminar este movimiento?")) {
+          setFinances(finances.filter(f => f.id !== id));
+        }
+      };
 
 
       // ================= RENDERIZADO DE PESTAÑAS =================
       const renderHabits = () => (
         <div className="space-y-6 animate-in">
-          
           <div className="flex flex-col sm:flex-row justify-between items-center bg-slate-800 p-4 rounded-2xl shadow-lg border border-slate-700 gap-4">
             <div className="flex items-center gap-3 w-full sm:w-auto">
               <CalendarDays className="text-emerald-500 w-6 h-6" />
-              <input 
-                type="date" 
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="bg-slate-900 border border-slate-600 rounded-lg p-2 text-white outline-none focus:border-emerald-500 w-full sm:w-auto font-medium"
-              />
+              <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="bg-slate-900 border border-slate-600 rounded-lg p-2 text-white outline-none focus:border-emerald-500 w-full sm:w-auto font-medium" />
             </div>
-            <button 
-              onClick={() => setIsEditingHabits(!isEditingHabits)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors w-full sm:w-auto justify-center ${isEditingHabits ? 'bg-emerald-600 text-white' : 'bg-slate-700 hover:bg-slate-600 text-slate-200'}`}
-            >
+            <button onClick={() => setIsEditingHabits(!isEditingHabits)} className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors w-full sm:w-auto justify-center ${isEditingHabits ? 'bg-emerald-600 text-white' : 'bg-slate-700 hover:bg-slate-600 text-slate-200'}`}>
               {isEditingHabits ? <CheckCircle2 className="w-4 h-4" /> : <Settings className="w-4 h-4" />}
               {isEditingHabits ? 'Finalizar Edición' : 'Gestionar Hábitos'}
             </button>
@@ -404,180 +401,74 @@
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700 flex flex-col justify-between">
-              <div className="flex justify-between items-start mb-2">
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Score Bienestar</span>
-                <Zap className={`w-5 h-5 ${habitAnalytics.currentWeekScore >= 70 ? 'text-yellow-400' : 'text-slate-500'}`} />
-              </div>
-              <div className="flex items-end gap-2">
-                <span className="text-3xl font-bold text-white">{habitAnalytics.currentWeekScore}%</span>
-                <span className={`text-xs font-medium mb-1 ${habitAnalytics.trend >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {habitAnalytics.trend >= 0 ? '+' : ''}{habitAnalytics.trend}% vs sem ant.
-                </span>
-              </div>
+              <div className="flex justify-between items-start mb-2"><span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Score Bienestar</span><Zap className={`w-5 h-5 ${habitAnalytics.currentWeekScore >= 70 ? 'text-yellow-400' : 'text-slate-500'}`} /></div>
+              <div className="flex items-end gap-2"><span className="text-3xl font-bold text-white">{habitAnalytics.currentWeekScore}%</span><span className={`text-xs font-medium mb-1 ${habitAnalytics.trend >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{habitAnalytics.trend >= 0 ? '+' : ''}{habitAnalytics.trend}% vs sem ant.</span></div>
             </div>
-
             <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700 flex flex-col justify-between">
-              <div className="flex justify-between items-start mb-2">
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Hábito Fuerte</span>
-                <Trophy className="w-5 h-5 text-emerald-400" />
-              </div>
-              <div>
-                <span className="text-sm font-bold text-white leading-tight block truncate">
-                  {habitAnalytics.strongestHabit ? habitAnalytics.strongestHabit.text : '---'}
-                </span>
-                <span className="text-xs text-slate-500">Últimos 30 días</span>
-              </div>
+              <div className="flex justify-between items-start mb-2"><span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Hábito Fuerte</span><Trophy className="w-5 h-5 text-emerald-400" /></div>
+              <div><span className="text-sm font-bold text-white leading-tight block truncate">{habitAnalytics.strongestHabit ? habitAnalytics.strongestHabit.text : '---'}</span><span className="text-xs text-slate-500">Últimos 30 días</span></div>
             </div>
-
             <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700 flex flex-col justify-between">
-              <div className="flex justify-between items-start mb-2">
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Por Mejorar</span>
-                <AlertTriangle className="w-5 h-5 text-orange-400" />
-              </div>
-              <div>
-                <span className="text-sm font-bold text-white leading-tight block truncate">
-                  {habitAnalytics.weakestHabit ? habitAnalytics.weakestHabit.text : '---'}
-                </span>
-                <span className="text-xs text-slate-500">Últimos 30 días</span>
-              </div>
+              <div className="flex justify-between items-start mb-2"><span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Por Mejorar</span><AlertTriangle className="w-5 h-5 text-orange-400" /></div>
+              <div><span className="text-sm font-bold text-white leading-tight block truncate">{habitAnalytics.weakestHabit ? habitAnalytics.weakestHabit.text : '---'}</span><span className="text-xs text-slate-500">Últimos 30 días</span></div>
             </div>
-
             <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700 flex flex-col justify-between">
-              <div className="flex justify-between items-start mb-2">
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Progreso Hoy</span>
-                <Target className="w-5 h-5 text-blue-400" />
-              </div>
+              <div className="flex justify-between items-start mb-2"><span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Progreso Hoy</span><Target className="w-5 h-5 text-blue-400" /></div>
               <div className="w-full bg-slate-900 rounded-full h-2.5 mb-1 mt-2">
-                <div 
-                  className="bg-blue-500 h-2.5 rounded-full transition-all duration-1000"
-                  style={{ width: `${Math.min(habitsList.length > 0 ? (currentCompletedIds.length / habitsList.length) * 100 : 0, 100)}%` }}
-                ></div>
+                <div className="bg-blue-500 h-2.5 rounded-full transition-all duration-1000" style={{ width: `${Math.min(habitsList.length > 0 ? (currentCompletedIds.length / habitsList.length) * 100 : 0, 100)}%` }}></div>
               </div>
-              <span className="text-xs font-medium text-white text-right">
-                {currentCompletedIds.length} / {habitsList.length} completados
-              </span>
+              <span className="text-xs font-medium text-white text-right">{currentCompletedIds.length} / {habitsList.length} completados</span>
             </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 bg-slate-800 rounded-2xl shadow-lg border border-slate-700 overflow-hidden flex flex-col">
               <h3 className="font-semibold text-white p-5 border-b border-slate-700 flex items-center gap-2 bg-slate-800/80">
-                <ListTodo className="w-5 h-5 text-emerald-500" />
-                {isEditingHabits ? 'Configuración de Hábitos' : 'Lista de Hoy'}
+                <ListTodo className="w-5 h-5 text-emerald-500" /> {isEditingHabits ? 'Configuración de Hábitos' : 'Lista de Hoy'}
               </h3>
-
               <div className="flex-1 overflow-x-auto">
                 {isEditingHabits ? (
                   <div className="p-4 bg-slate-900/50 min-w-[650px]">
                     <table className="w-full text-left text-sm text-slate-300 mb-6">
                       <thead className="text-xs uppercase text-slate-400 border-b border-slate-700">
-                        <tr>
-                          <th className="pb-3 px-2">Hábito</th>
-                          <th className="pb-3 px-2 w-32">Categoría</th>
-                          <th className="pb-3 px-2 w-24">Inicio</th>
-                          <th className="pb-3 px-2 w-24">Fin</th>
-                          <th className="pb-3 pl-2 w-10 text-center"></th>
-                        </tr>
+                        <tr><th className="pb-3 px-2">Hábito</th><th className="pb-3 px-2 w-32">Categoría</th><th className="pb-3 px-2 w-24">Inicio</th><th className="pb-3 px-2 w-24">Fin</th><th className="pb-3 pl-2 w-10 text-center"></th></tr>
                       </thead>
                       <tbody className="divide-y divide-slate-800">
                         {habitsList.map((habit) => (
                           <tr key={habit.id}>
-                            <td className="py-2 px-2">
-                              <input 
-                                value={habit.text} onChange={(e) => handleUpdateHabit(habit.id, 'text', e.target.value)}
-                                className="bg-slate-900 text-sm text-white border border-slate-600 rounded p-2 outline-none focus:border-emerald-500 w-full"
-                              />
-                            </td>
-                            <td className="py-2 px-2">
-                              <select 
-                                value={habit.category || 'rutina'} onChange={(e) => handleUpdateHabit(habit.id, 'category', e.target.value)}
-                                className="bg-slate-900 text-xs text-white border border-slate-600 rounded p-2 outline-none focus:border-emerald-500 w-full"
-                              >
-                                {Object.entries(CATEGORIES).map(([key, cat]) => <option key={key} value={key}>{cat.label}</option>)}
-                              </select>
-                            </td>
-                            <td className="py-2 px-2">
-                              <input 
-                                type="time" value={habit.startTime} onChange={(e) => handleUpdateHabit(habit.id, 'startTime', e.target.value)}
-                                className="bg-slate-900 text-xs text-emerald-400 border border-slate-600 rounded p-2 outline-none focus:border-emerald-500 w-full"
-                              />
-                            </td>
-                            <td className="py-2 px-2">
-                              <input 
-                                type="time" value={habit.endTime} onChange={(e) => handleUpdateHabit(habit.id, 'endTime', e.target.value)}
-                                className="bg-slate-900 text-xs text-emerald-400 border border-slate-600 rounded p-2 outline-none focus:border-emerald-500 w-full"
-                              />
-                            </td>
-                            <td className="py-2 pl-2">
-                              <button onClick={() => handleDeleteHabit(habit.id)} className="bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white p-2 rounded transition-colors w-full flex justify-center items-center">
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </td>
+                            <td className="py-2 px-2"><input value={habit.text} onChange={(e) => handleUpdateHabit(habit.id, 'text', e.target.value)} className="bg-slate-900 text-sm text-white border border-slate-600 rounded p-2 outline-none focus:border-emerald-500 w-full" /></td>
+                            <td className="py-2 px-2"><select value={habit.category || 'rutina'} onChange={(e) => handleUpdateHabit(habit.id, 'category', e.target.value)} className="bg-slate-900 text-xs text-white border border-slate-600 rounded p-2 outline-none focus:border-emerald-500 w-full">{Object.entries(CATEGORIES).map(([key, cat]) => <option key={key} value={key}>{cat.label}</option>)}</select></td>
+                            <td className="py-2 px-2"><input type="time" value={habit.startTime} onChange={(e) => handleUpdateHabit(habit.id, 'startTime', e.target.value)} className="bg-slate-900 text-xs text-emerald-400 border border-slate-600 rounded p-2 outline-none focus:border-emerald-500 w-full" /></td>
+                            <td className="py-2 px-2"><input type="time" value={habit.endTime} onChange={(e) => handleUpdateHabit(habit.id, 'endTime', e.target.value)} className="bg-slate-900 text-xs text-emerald-400 border border-slate-600 rounded p-2 outline-none focus:border-emerald-500 w-full" /></td>
+                            <td className="py-2 pl-2"><button onClick={() => handleDeleteHabit(habit.id)} className="bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white p-2 rounded transition-colors w-full flex justify-center items-center"><Trash2 className="w-4 h-4" /></button></td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
-                    
                     <div className="border-t border-slate-700 pt-4">
                       <h4 className="text-sm font-semibold text-emerald-400 mb-3 flex items-center gap-1"><Plus className="w-4 h-4" /> Agregar Nuevo</h4>
                       <div className="flex gap-2">
-                        <input 
-                          value={newHabit.text} onChange={(e) => setNewHabit({...newHabit, text: e.target.value})}
-                          placeholder="Descripción..." onKeyPress={(e) => e.key === 'Enter' && handleAddHabit()}
-                          className="bg-slate-900 text-sm text-white border border-slate-600 rounded p-2 outline-none flex-1 focus:border-emerald-500"
-                        />
-                        <select 
-                          value={newHabit.category} onChange={(e) => setNewHabit({...newHabit, category: e.target.value})}
-                          className="bg-slate-900 text-xs text-white border border-slate-600 rounded p-2 outline-none focus:border-emerald-500"
-                        >
-                          {Object.entries(CATEGORIES).map(([key, cat]) => <option key={key} value={key}>{cat.label}</option>)}
-                        </select>
-                        <input 
-                          type="time" value={newHabit.startTime} onChange={(e) => setNewHabit({...newHabit, startTime: e.target.value})}
-                          className="bg-slate-900 text-xs text-white border border-slate-600 rounded p-2 outline-none w-24 focus:border-emerald-500"
-                        />
+                        <input value={newHabit.text} onChange={(e) => setNewHabit({...newHabit, text: e.target.value})} placeholder="Descripción..." onKeyPress={(e) => e.key === 'Enter' && handleAddHabit()} className="bg-slate-900 text-sm text-white border border-slate-600 rounded p-2 outline-none flex-1 focus:border-emerald-500" />
+                        <select value={newHabit.category} onChange={(e) => setNewHabit({...newHabit, category: e.target.value})} className="bg-slate-900 text-xs text-white border border-slate-600 rounded p-2 outline-none focus:border-emerald-500">{Object.entries(CATEGORIES).map(([key, cat]) => <option key={key} value={key}>{cat.label}</option>)}</select>
+                        <input type="time" value={newHabit.startTime} onChange={(e) => setNewHabit({...newHabit, startTime: e.target.value})} className="bg-slate-900 text-xs text-white border border-slate-600 rounded p-2 outline-none w-24 focus:border-emerald-500" />
                         <button onClick={handleAddHabit} className="bg-emerald-600 text-white px-3 py-2 rounded hover:bg-emerald-500 font-medium">Añadir</button>
                       </div>
                     </div>
                   </div>
                 ) : (
-                  habitsList.length === 0 ? (
-                    <div className="p-8 text-center text-slate-500 text-sm">Activa "Gestionar Hábitos" para empezar.</div>
-                  ) : (
+                  habitsList.length === 0 ? ( <div className="p-8 text-center text-slate-500 text-sm">Activa "Gestionar Hábitos" para empezar.</div> ) : (
                     <table className="w-full text-left text-sm text-slate-300 min-w-[500px]">
                       <tbody className="divide-y divide-slate-700/50">
                         {habitsList.map((habit) => {
                           const isCompleted = currentCompletedIds.includes(habit.id);
                           const cat = CATEGORIES[habit.category || 'rutina'];
                           const streak = habitAnalytics.streaks[habit.id] || 0;
-
                           return (
                             <tr key={habit.id} className="hover:bg-slate-700/30 transition-colors group">
-                              <td className="px-4 py-3 text-center w-12">
-                                <button onClick={() => toggleHabitCompletion(habit.id)} className="focus:outline-none translate-y-[2px]">
-                                  {isCompleted ? <CheckCircle2 className="w-6 h-6 text-emerald-500 mx-auto transition-transform scale-110" /> : <Circle className="w-6 h-6 text-slate-500 mx-auto hover:text-slate-400" />}
-                                </button>
-                              </td>
-                              <td className="px-2 py-3">
-                                <div className="flex items-center gap-2">
-                                  <span className={`font-medium transition-colors ${isCompleted ? 'text-slate-500 line-through' : 'text-slate-100'}`}>
-                                    {habit.text}
-                                  </span>
-                                  {streak >= 3 && (
-                                    <span className="flex items-center gap-0.5 text-xs font-bold text-orange-500 bg-orange-500/10 px-1.5 py-0.5 rounded" title="Racha actual">
-                                      <Flame className="w-3 h-3" /> {streak}
-                                    </span>
-                                  )}
-                                </div>
-                              </td>
-                              <td className="px-2 py-3 w-32">
-                                <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-1 rounded-full ${cat.bg} ${cat.color}`}>
-                                  {cat.label}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap text-right w-32">
-                                {habit.startTime || '--:--'} <span className="opacity-50 mx-1">-</span> {habit.endTime || '--:--'}
-                              </td>
+                              <td className="px-4 py-3 text-center w-12"><button onClick={() => toggleHabitCompletion(habit.id)} className="focus:outline-none translate-y-[2px]">{isCompleted ? <CheckCircle2 className="w-6 h-6 text-emerald-500 mx-auto transition-transform scale-110" /> : <Circle className="w-6 h-6 text-slate-500 mx-auto hover:text-slate-400" />}</button></td>
+                              <td className="px-2 py-3"><div className="flex items-center gap-2"><span className={`font-medium transition-colors ${isCompleted ? 'text-slate-500 line-through' : 'text-slate-100'}`}>{habit.text}</span>{streak >= 3 && <span className="flex items-center gap-0.5 text-xs font-bold text-orange-500 bg-orange-500/10 px-1.5 py-0.5 rounded" title="Racha actual"><Flame className="w-3 h-3" /> {streak}</span>}</div></td>
+                              <td className="px-2 py-3 w-32"><span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-1 rounded-full ${cat.bg} ${cat.color}`}>{cat.label}</span></td>
+                              <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap text-right w-32">{habit.startTime || '--:--'} <span className="opacity-50 mx-1">-</span> {habit.endTime || '--:--'}</td>
                             </tr>
                           );
                         })}
@@ -597,46 +488,22 @@
                     if (!stats || stats.total === 0) return null;
                     return (
                       <div key={key}>
-                        <div className="flex justify-between text-xs mb-1">
-                          <span className={`${cat.color} font-medium`}>{cat.label}</span>
-                          <span className="text-slate-400">{stats.percentage}%</span>
-                        </div>
-                        <div className="w-full bg-slate-900 rounded-full h-1.5">
-                          <div className={`h-1.5 rounded-full ${cat.bar} transition-all duration-700`} style={{ width: `${stats.percentage}%` }}></div>
-                        </div>
+                        <div className="flex justify-between text-xs mb-1"><span className={`${cat.color} font-medium`}>{cat.label}</span><span className="text-slate-400">{stats.percentage}%</span></div>
+                        <div className="w-full bg-slate-900 rounded-full h-1.5"><div className={`h-1.5 rounded-full ${cat.bar} transition-all duration-700`} style={{ width: `${stats.percentage}%` }}></div></div>
                       </div>
                     )
                   })}
                 </div>
               </div>
-
               <div className="bg-slate-800 rounded-2xl shadow-lg border border-slate-700 p-5 flex flex-col flex-1 min-h-[220px]">
-                <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2 uppercase tracking-wider">
-                  <BarChart className="w-4 h-4 text-blue-500" />
-                  Semana Actual
-                </h3>
-                
+                <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2 uppercase tracking-wider"><BarChart className="w-4 h-4 text-blue-500" />Semana Actual</h3>
                 <div className="relative flex-1 flex items-end justify-between gap-1 mt-auto pt-6">
-                  <div className="absolute inset-0 flex flex-col justify-between pointer-events-none z-0">
-                    {[100, 50, 0].map(val => (
-                      <div key={val} className="flex items-center w-full border-b border-slate-700/30 h-0"></div>
-                    ))}
-                  </div>
-
+                  <div className="absolute inset-0 flex flex-col justify-between pointer-events-none z-0">{[100, 50, 0].map(val => <div key={val} className="flex items-center w-full border-b border-slate-700/30 h-0"></div>)}</div>
                   {habitAnalytics.trendData.map((data, i) => (
                     <div key={i} className="flex flex-col items-center w-full group relative z-10 h-full justify-end">
-                      <span className="text-[10px] font-bold text-white mb-1 opacity-0 group-hover:opacity-100 transition-opacity absolute -top-5 bg-slate-900 px-1 py-0.5 rounded z-20">
-                        {data.percentage}%
-                      </span>
-                      <div 
-                        className={`w-full max-w-[1.5rem] rounded-t-sm transition-all duration-700 relative ${
-                          data.isSelected ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]' : 'bg-slate-600 hover:bg-slate-500'
-                        }`} 
-                        style={{ height: `${data.percentage}%`, minHeight: data.percentage > 0 ? '4px' : '2px' }}
-                      ></div>
-                      <span className={`text-[9px] mt-2 uppercase tracking-widest ${data.isSelected ? 'text-emerald-400 font-bold' : 'text-slate-500'}`}>
-                        {data.dayName.charAt(0)}
-                      </span>
+                      <span className="text-[10px] font-bold text-white mb-1 opacity-0 group-hover:opacity-100 transition-opacity absolute -top-5 bg-slate-900 px-1 py-0.5 rounded z-20">{data.percentage}%</span>
+                      <div className={`w-full max-w-[1.5rem] rounded-t-sm transition-all duration-700 relative ${data.isSelected ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]' : 'bg-slate-600 hover:bg-slate-500'}`} style={{ height: `${data.percentage}%`, minHeight: data.percentage > 0 ? '4px' : '2px' }}></div>
+                      <span className={`text-[9px] mt-2 uppercase tracking-widest ${data.isSelected ? 'text-emerald-400 font-bold' : 'text-slate-500'}`}>{data.dayName.charAt(0)}</span>
                     </div>
                   ))}
                 </div>
@@ -646,6 +513,178 @@
         </div>
       );
 
+      const renderFinances = () => (
+        <div className="space-y-6 animate-in">
+          
+          {/* HEADER BINANCE STYLE - BALANCE TOTAL */}
+          <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 flex flex-col md:flex-row justify-between items-center shadow-lg gap-6">
+            <div>
+              <p className="text-slate-400 text-sm font-medium uppercase tracking-wider flex items-center gap-2 mb-1">
+                Balance Estimado de Activos
+              </p>
+              <h2 className="text-4xl font-extrabold text-white">{formatCurrency(financeData.totalBalance)}</h2>
+            </div>
+            
+            {/* SELECTOR DE PERIODO */}
+            <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-700/50 self-stretch md:self-auto items-center">
+              {['semana', 'quincena', 'mes', 'todo'].map(period => (
+                <button 
+                  key={period}
+                  onClick={() => setFinanceFilter(period)}
+                  className={`px-4 py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-colors ${financeFilter === period ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
+                >
+                  {period}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* DESGLOSE POR CUENTAS */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Tarjeta NuBank */}
+            <div className="bg-gradient-to-br from-purple-900/40 to-slate-800 p-5 rounded-2xl border border-purple-500/30 relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-3 opacity-20 group-hover:opacity-40 transition-opacity"><Landmark className="w-16 h-16 text-purple-400" /></div>
+              <div className="flex justify-between items-start mb-4 relative z-10">
+                <span className="font-semibold text-purple-300 flex items-center gap-2"><Landmark className="w-4 h-4"/> NuBank (Ahorro)</span>
+                <span className="bg-purple-500/20 text-purple-300 text-[10px] px-2 py-1 rounded font-bold border border-purple-500/30">9.25% E.A</span>
+              </div>
+              <p className="text-2xl font-bold text-white relative z-10">{formatCurrency(financeData.balances.nubank)}</p>
+              <p className="text-xs text-purple-300/70 mt-2 flex items-center gap-1 relative z-10">
+                <TrendingUp className="w-3 h-3"/> +{formatCurrency(financeData.estimatedMonthlyYield)} est. por mes
+              </p>
+            </div>
+
+            {/* Tarjeta Nequi */}
+            <div className="bg-gradient-to-br from-pink-900/20 to-slate-800 p-5 rounded-2xl border border-pink-500/20 relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-30 transition-opacity"><Smartphone className="w-16 h-16 text-pink-400" /></div>
+              <div className="flex justify-between items-start mb-4 relative z-10">
+                <span className="font-semibold text-pink-400 flex items-center gap-2"><Smartphone className="w-4 h-4"/> Nequi (Gastos)</span>
+              </div>
+              <p className="text-2xl font-bold text-white relative z-10">{formatCurrency(financeData.balances.nequi)}</p>
+              <p className="text-xs text-slate-500 mt-2 relative z-10">Transferencias y pagos digitales</p>
+            </div>
+
+            {/* Tarjeta Efectivo */}
+            <div className="bg-gradient-to-br from-emerald-900/20 to-slate-800 p-5 rounded-2xl border border-emerald-500/20 relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-30 transition-opacity"><Wallet className="w-16 h-16 text-emerald-400" /></div>
+              <div className="flex justify-between items-start mb-4 relative z-10">
+                <span className="font-semibold text-emerald-400 flex items-center gap-2"><Wallet className="w-4 h-4"/> Efectivo</span>
+              </div>
+              <p className="text-2xl font-bold text-white relative z-10">{formatCurrency(financeData.balances.efectivo)}</p>
+              <p className="text-xs text-slate-500 mt-2 relative z-10">Gastos diarios y hormiga</p>
+            </div>
+          </div>
+
+          {/* RESUMEN DEL PERIODO SELECCIONADO Y FORMULARIO */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            {/* Panel de Formulario */}
+            <div className="lg:col-span-1 bg-slate-800 p-5 rounded-2xl border border-slate-700 flex flex-col">
+              <h3 className="font-bold text-white mb-4 flex items-center gap-2">
+                {financeForm.id ? <Edit2 className="w-4 h-4 text-blue-400"/> : <Plus className="w-4 h-4 text-emerald-400"/>}
+                {financeForm.id ? 'Editar Movimiento' : 'Registrar Movimiento'}
+              </h3>
+              
+              <form onSubmit={handleAddOrEditTransaction} className="flex flex-col gap-4 flex-1">
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button" onClick={() => setFinanceForm({...financeForm, type: 'ingreso'})} className={`py-2 rounded-lg text-xs font-bold uppercase transition-colors ${financeForm.type === 'ingreso' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50' : 'bg-slate-900 text-slate-500 border border-slate-700'}`}>Ingreso (+)</button>
+                  <button type="button" onClick={() => setFinanceForm({...financeForm, type: 'egreso'})} className={`py-2 rounded-lg text-xs font-bold uppercase transition-colors ${financeForm.type === 'egreso' ? 'bg-red-500/20 text-red-400 border border-red-500/50' : 'bg-slate-900 text-slate-500 border border-slate-700'}`}>Egreso (-)</button>
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-400 mb-1 block">Cuenta destino/origen</label>
+                  <select value={financeForm.account} onChange={(e) => setFinanceForm({...financeForm, account: e.target.value})} className="w-full bg-slate-900 text-white border border-slate-700 rounded-lg p-3 outline-none focus:border-blue-500 text-sm">
+                    <option value="nequi">Nequi</option>
+                    <option value="nubank">NuBank</option>
+                    <option value="efectivo">Efectivo</option>
+                  </select>
+                </div>
+
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <label className="text-xs text-slate-400 mb-1 block">Monto (COP)</label>
+                    <input type="number" required value={financeForm.amount} onChange={(e) => setFinanceForm({...financeForm, amount: e.target.value})} className="w-full bg-slate-900 text-white border border-slate-700 rounded-lg p-3 outline-none focus:border-blue-500 text-sm font-medium" placeholder="Ej. 50000" />
+                  </div>
+                  <div className="w-1/3">
+                    <label className="text-xs text-slate-400 mb-1 block">Fecha</label>
+                    <input type="date" required value={financeForm.date} onChange={(e) => setFinanceForm({...financeForm, date: e.target.value})} className="w-full bg-slate-900 text-white border border-slate-700 rounded-lg p-3 outline-none focus:border-blue-500 text-sm" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-400 mb-1 block">Descripción</label>
+                  <input type="text" required value={financeForm.description} onChange={(e) => setFinanceForm({...financeForm, description: e.target.value})} className="w-full bg-slate-900 text-white border border-slate-700 rounded-lg p-3 outline-none focus:border-blue-500 text-sm" placeholder="Ej. Almuerzo, Sueldo..." />
+                </div>
+
+                <div className="mt-auto pt-4 flex gap-2">
+                  {financeForm.id && (
+                    <button type="button" onClick={() => setFinanceForm({ id: null, type: 'egreso', amount: '', description: '', account: 'nequi', date: getTodayString() })} className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-3 rounded-lg font-semibold transition-colors">
+                      Cancelar
+                    </button>
+                  )}
+                  <button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-lg font-semibold transition-colors">
+                    {financeForm.id ? 'Guardar Cambios' : 'Registrar'}
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* Panel de Historial */}
+            <div className="lg:col-span-2 bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden flex flex-col">
+              <div className="p-5 border-b border-slate-700 bg-slate-800/80 flex justify-between items-center">
+                <h3 className="font-bold text-white">Historial de Transacciones</h3>
+                <div className="flex gap-4 text-xs font-medium">
+                  <span className="text-emerald-400 flex items-center gap-1"><TrendingUp className="w-3 h-3"/> +{formatCurrency(financeData.totalIngresos)}</span>
+                  <span className="text-red-400 flex items-center gap-1"><TrendingDown className="w-3 h-3"/> -{formatCurrency(financeData.totalEgresos)}</span>
+                </div>
+              </div>
+
+              <div className="divide-y divide-slate-700/50 flex-1 overflow-y-auto max-h-[400px]">
+                {financeData.filteredList.length === 0 ? (
+                  <p className="p-8 text-center text-slate-500">No hay movimientos en este periodo.</p>
+                ) : (
+                  financeData.filteredList.map(item => (
+                    <div key={item.id} className="flex justify-between items-center p-4 hover:bg-slate-700/30 group transition-colors">
+                      <div className="flex items-center gap-4">
+                        <div className={`p-2 rounded-full ${item.type === 'ingreso' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                          {item.type === 'ingreso' ? <TrendingUp className="w-4 h-4"/> : <TrendingDown className="w-4 h-4"/>}
+                        </div>
+                        <div>
+                          <p className="text-slate-200 font-medium">{item.description}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className={`text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded border ${
+                              item.account === 'nubank' ? 'bg-purple-900/40 text-purple-300 border-purple-500/30' :
+                              item.account === 'nequi' ? 'bg-pink-900/20 text-pink-400 border-pink-500/30' :
+                              'bg-emerald-900/20 text-emerald-400 border-emerald-500/30'
+                            }`}>
+                              {item.account || 'Efectivo'}
+                            </span>
+                            <span className="text-xs text-slate-500">{item.date}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <span className={`font-bold ${item.type === 'ingreso' ? 'text-emerald-400' : 'text-red-400'}`}>
+                          {item.type === 'ingreso' ? '+' : '-'}{formatCurrency(item.amount)}
+                        </span>
+                        
+                        {/* Controles de Edición Ocultos (Aparecen al hacer hover) */}
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                          <button onClick={() => handleEditTransactionClick(item)} className="p-1.5 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded transition-colors"><Edit2 className="w-4 h-4"/></button>
+                          <button onClick={() => handleDeleteTransaction(item.id)} className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"><Trash2 className="w-4 h-4"/></button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+
+        </div>
+      );
+
+      // (Las funciones renderGoals, renderHealth, renderGym quedan igual y están funcionales)
       const renderGoals = () => (
         <div className="space-y-6 animate-in">
           <div className="bg-gradient-to-r from-blue-900 to-slate-800 p-6 rounded-2xl shadow-lg border border-blue-800">
@@ -712,47 +751,6 @@
                 </div>
               );
             })}
-          </div>
-        </div>
-      );
-
-      const renderFinances = () => (
-        <div className="space-y-6 animate-in">
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700">
-              <div className="flex items-center gap-2 text-emerald-400 mb-2"><TrendingUp className="w-5 h-5" /> <span className="font-semibold text-sm">Ingresos</span></div>
-              <p className="text-2xl font-bold text-white">${financeTotals.income.toLocaleString()}</p>
-            </div>
-            <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700">
-              <div className="flex items-center gap-2 text-red-400 mb-2"><TrendingDown className="w-5 h-5" /> <span className="font-semibold text-sm">Egresos</span></div>
-              <p className="text-2xl font-bold text-white">${financeTotals.expense.toLocaleString()}</p>
-            </div>
-            <div className="col-span-2 md:col-span-1 bg-slate-800 p-4 rounded-2xl border border-slate-700">
-              <div className="flex items-center gap-2 text-blue-400 mb-2"><DollarSign className="w-5 h-5" /> <span className="font-semibold text-sm">Balance</span></div>
-              <p className={`text-2xl font-bold ${financeTotals.income - financeTotals.expense >= 0 ? 'text-white' : 'text-red-400'}`}>${(financeTotals.income - financeTotals.expense).toLocaleString()}</p>
-            </div>
-          </div>
-          <div className="bg-slate-800 p-5 rounded-2xl border border-slate-700">
-            <h3 className="font-bold text-white mb-4">Registrar Movimiento</h3>
-            <form onSubmit={addTransaction} className="flex flex-col md:flex-row gap-4">
-              <select value={financeForm.type} onChange={(e) => setFinanceForm({...financeForm, type: e.target.value})} className="bg-slate-900 text-white border border-slate-700 rounded-lg p-3 outline-none focus:border-emerald-500">
-                <option value="ingreso">Ingreso (+)</option><option value="egreso">Egreso (-)</option>
-              </select>
-              <input type="number" placeholder="Monto ($)" value={financeForm.amount} onChange={(e) => setFinanceForm({...financeForm, amount: e.target.value})} className="flex-1 bg-slate-900 text-white border border-slate-700 rounded-lg p-3 outline-none focus:border-emerald-500" />
-              <input type="text" placeholder="Descripción (ej. Sueldo, Almuerzo)" value={financeForm.description} onChange={(e) => setFinanceForm({...financeForm, description: e.target.value})} className="flex-[2] bg-slate-900 text-white border border-slate-700 rounded-lg p-3 outline-none focus:border-emerald-500" />
-              <button type="submit" className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-3 rounded-lg font-semibold transition-colors">Añadir</button>
-            </form>
-          </div>
-          <div className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden">
-            <h3 className="font-bold text-white p-4 border-b border-slate-700 bg-slate-800/50">Historial Reciente</h3>
-            <div className="divide-y divide-slate-700/50">
-              {finances.length === 0 ? <p className="p-6 text-center text-slate-500">No hay movimientos registrados aún.</p> : finances.slice().reverse().map(item => (
-                  <div key={item.id} className="flex justify-between items-center p-4 hover:bg-slate-700/30">
-                    <div><p className="text-slate-200 font-medium">{item.description}</p><p className="text-xs text-slate-500">{item.date}</p></div>
-                    <div className={`font-bold ${item.type === 'ingreso' ? 'text-emerald-400' : 'text-red-400'}`}>{item.type === 'ingreso' ? '+' : '-'}${item.amount.toLocaleString()}</div>
-                  </div>
-                ))}
-            </div>
           </div>
         </div>
       );
