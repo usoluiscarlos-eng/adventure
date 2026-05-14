@@ -205,7 +205,6 @@
         account: 'nequi', toAccount: 'nubank', category: 'variable', date: getTodayString() 
       });
 
-      // Nuevo Estado para Edición de Gym
       const [isEditingGym, setIsEditingGym] = useState(false);
       const [newRoutine, setNewRoutine] = useState({ day: 'Lunes', focus: '', duration: 60 });
       const [cardioPrompt, setCardioPrompt] = useState({ isOpen: false, routineId: null });
@@ -379,10 +378,9 @@
         gymRoutine.forEach(r => {
           if (r.completed) {
             completedCount++;
-            vitalityPoints += 10; // 10 puntos por rutina cumplida
-            if (r.isCardioDone) vitalityPoints += 5; // 5 extra por cardio completado
+            vitalityPoints += 10; 
+            if (r.isCardioDone) vitalityPoints += 5; 
 
-            // Algoritmo básico para identificar el músculo más trabajado
             const muscles = r.focus.split(/ y |,| \/ | /).map(m => m.trim().toLowerCase()).filter(m => m.length > 3 && !['rutina','descanso','total','hiit'].includes(m));
             muscles.forEach(m => {
               muscleCounts[m] = (muscleCounts[m] || 0) + 1;
@@ -476,7 +474,7 @@
 
       // ================= RENDERIZADO DE PESTAÑAS =================
       const renderHabits = () => (
-        <div className="space-y-6 animate-in">
+        <div className="space-y-6 animate-in fade-in">
           <div className="flex flex-col sm:flex-row justify-between items-center bg-slate-800 p-4 rounded-2xl shadow-lg border border-slate-700 gap-4">
             <div className="flex items-center gap-3 w-full sm:w-auto">
               <CalendarDays className="text-emerald-500 w-6 h-6" />
@@ -515,10 +513,10 @@
               <h3 className="font-semibold text-white p-5 border-b border-slate-700 flex items-center gap-2 bg-slate-800/80">
                 <ListTodo className="w-5 h-5 text-emerald-500" /> {isEditingHabits ? 'Configuración de Hábitos' : 'Lista de Hoy'}
               </h3>
-              <div className="flex-1 overflow-x-auto">
+              <div className="flex-1 overflow-x-auto w-full">
                 {isEditingHabits ? (
-                  <div className="p-4 bg-slate-900/50 min-w-[650px]">
-                    <table className="w-full text-left text-sm text-slate-300 mb-6">
+                  <div className="p-4 bg-slate-900/50">
+                    <table className="w-full text-left text-sm text-slate-300 mb-6 min-w-[650px]">
                       <thead className="text-xs uppercase text-slate-400 border-b border-slate-700">
                         <tr><th className="pb-3 px-2">Hábito</th><th className="pb-3 px-2 w-32">Categoría</th><th className="pb-3 px-2 w-24">Inicio</th><th className="pb-3 px-2 w-24">Fin</th><th className="pb-3 pl-2 w-10 text-center"></th></tr>
                       </thead>
@@ -536,11 +534,11 @@
                     </table>
                     <div className="border-t border-slate-700 pt-4">
                       <h4 className="text-sm font-semibold text-emerald-400 mb-3 flex items-center gap-1"><Plus className="w-4 h-4" /> Agregar Nuevo</h4>
-                      <div className="flex gap-2">
-                        <input value={newHabit.text} onChange={(e) => setNewHabit({...newHabit, text: e.target.value})} placeholder="Descripción..." onKeyPress={(e) => e.key === 'Enter' && handleAddHabit()} className="bg-slate-900 text-sm text-white border border-slate-600 rounded p-2 outline-none flex-1 focus:border-emerald-500" />
-                        <select value={newHabit.category} onChange={(e) => setNewHabit({...newHabit, category: e.target.value})} className="bg-slate-900 text-xs text-white border border-slate-600 rounded p-2 outline-none focus:border-emerald-500">{Object.entries(CATEGORIES).map(([key, cat]) => <option key={key} value={key}>{cat.label}</option>)}</select>
-                        <input type="time" value={newHabit.startTime} onChange={(e) => setNewHabit({...newHabit, startTime: e.target.value})} className="bg-slate-900 text-xs text-white border border-slate-600 rounded p-2 outline-none w-24 focus:border-emerald-500" />
-                        <button onClick={handleAddHabit} className="bg-emerald-600 text-white px-3 py-2 rounded hover:bg-emerald-500 font-medium">Añadir</button>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <input value={newHabit.text} onChange={(e) => setNewHabit({...newHabit, text: e.target.value})} placeholder="Descripción..." onKeyPress={(e) => e.key === 'Enter' && handleAddHabit()} className="bg-slate-900 text-sm text-white border border-slate-600 rounded p-2 outline-none w-full sm:flex-1 focus:border-emerald-500" />
+                        <select value={newHabit.category} onChange={(e) => setNewHabit({...newHabit, category: e.target.value})} className="bg-slate-900 text-xs text-white border border-slate-600 rounded p-2 outline-none w-full sm:w-auto focus:border-emerald-500">{Object.entries(CATEGORIES).map(([key, cat]) => <option key={key} value={key}>{cat.label}</option>)}</select>
+                        <input type="time" value={newHabit.startTime} onChange={(e) => setNewHabit({...newHabit, startTime: e.target.value})} className="bg-slate-900 text-xs text-white border border-slate-600 rounded p-2 outline-none w-full sm:w-24 focus:border-emerald-500" />
+                        <button onClick={handleAddHabit} className="bg-emerald-600 text-white px-3 py-2 rounded hover:bg-emerald-500 font-medium w-full sm:w-auto">Añadir</button>
                       </div>
                     </div>
                   </div>
@@ -1075,8 +1073,8 @@
           {/* Rutina Principal */}
           <div className="bg-slate-800 rounded-2xl shadow-lg border border-slate-700 overflow-hidden">
             {isEditingGym ? (
-               <div className="p-5 overflow-x-auto min-w-[700px]">
-                  <table className="w-full text-left text-sm text-slate-300">
+               <div className="p-4 sm:p-5 overflow-x-auto w-full">
+                  <table className="w-full text-left text-sm text-slate-300 min-w-[500px]">
                       <thead className="text-xs uppercase text-slate-400 border-b border-slate-700">
                         <tr>
                           <th className="pb-3 px-2 w-32">Día</th>
@@ -1107,15 +1105,15 @@
                       </tbody>
                   </table>
                   
-                  <div className="border-t border-slate-700 pt-4 mt-2">
+                  <div className="border-t border-slate-700 pt-4 mt-4">
                       <h4 className="text-sm font-semibold text-indigo-400 mb-3 flex items-center gap-1"><Plus className="w-4 h-4" /> Agregar Día de Entrenamiento</h4>
-                      <div className="flex gap-2 items-center">
-                        <select value={newRoutine.day} onChange={(e) => setNewRoutine({...newRoutine, day: e.target.value})} className="bg-slate-900 text-xs text-white border border-slate-600 rounded p-2 outline-none w-32 focus:border-indigo-500">
+                      <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                        <select value={newRoutine.day} onChange={(e) => setNewRoutine({...newRoutine, day: e.target.value})} className="bg-slate-900 text-xs text-white border border-slate-600 rounded p-2 outline-none w-full sm:w-32 focus:border-indigo-500">
                             {WEEK_DAYS.map(d => <option key={d} value={d}>{d}</option>)}
                         </select>
-                        <input type="text" value={newRoutine.focus} onChange={(e) => setNewRoutine({...newRoutine, focus: e.target.value})} placeholder="Enfoque muscular..." onKeyPress={(e) => e.key === 'Enter' && handleAddRoutine()} className="bg-slate-900 text-sm text-white border border-slate-600 rounded p-2 outline-none flex-1 focus:border-indigo-500" />
-                        <input type="number" value={newRoutine.duration} onChange={(e) => setNewRoutine({...newRoutine, duration: parseInt(e.target.value) || 0})} placeholder="Min" className="bg-slate-900 text-sm text-white border border-slate-600 rounded p-2 outline-none w-20 text-center focus:border-indigo-500" />
-                        <button onClick={handleAddRoutine} className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-500 font-medium">Añadir</button>
+                        <input type="text" value={newRoutine.focus} onChange={(e) => setNewRoutine({...newRoutine, focus: e.target.value})} placeholder="Enfoque muscular..." onKeyPress={(e) => e.key === 'Enter' && handleAddRoutine()} className="bg-slate-900 text-sm text-white border border-slate-600 rounded p-2 outline-none w-full sm:flex-1 focus:border-indigo-500" />
+                        <input type="number" value={newRoutine.duration} onChange={(e) => setNewRoutine({...newRoutine, duration: parseInt(e.target.value) || 0})} placeholder="Min" className="bg-slate-900 text-sm text-white border border-slate-600 rounded p-2 outline-none w-full sm:w-20 sm:text-center focus:border-indigo-500" />
+                        <button onClick={handleAddRoutine} className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-500 font-medium w-full sm:w-auto">Añadir</button>
                       </div>
                   </div>
                </div>
