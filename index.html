@@ -58,15 +58,19 @@
   <script type="text/babel">
     const { useState, useEffect, useMemo, useCallback } = React;
 
-    // --- CONFIGURACIÓN DE FIREBASE ---
+    // =========================================================================
+    // CONFIGURACIÓN OFICIAL DE FIREBASE (CORREGIDA)
+    // =========================================================================
     const firebaseConfig = {
-      apiKey: "AIzaSyCvUVDuUHfRfY0caqvKFHLK7L3OqaGgVoY",
+      apiKey: "AIzaSyCvUVDUuHfRfY0caqvKFHLK7l3OqaGgVoY",
       authDomain: "adventure-app-ecf2f.firebaseapp.com",
+      databaseURL: "https://adventure-app-ecf2f-default-rtdb.firebaseio.com",
       projectId: "adventure-app-ecf2f",
       storageBucket: "adventure-app-ecf2f.firebasestorage.app",
       messagingSenderId: "900482922133",
       appId: "1:900482922133:web:fb4a1ab83ad71f5f968d9c"
     };
+    // =========================================================================
 
     if (!firebase.apps.length) {
       firebase.initializeApp(firebaseConfig);
@@ -109,6 +113,8 @@
     const Cloud = (p) => <IconWrapper {...p}><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></IconWrapper>;
     const LogOut = (p) => <IconWrapper {...p}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></IconWrapper>;
     const Shield = (p) => <IconWrapper {...p}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></IconWrapper>;
+    const Eye = (p) => <IconWrapper {...p}><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></IconWrapper>;
+    const EyeOff = (p) => <IconWrapper {...p}><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></IconWrapper>;
 
     const CATEGORIES = {
       'salud': { label: 'Salud', color: 'text-rose-400', bg: 'bg-rose-500/20', bar: 'bg-rose-500' },
@@ -157,16 +163,30 @@
 
 
     function App() {
-      // --- SISTEMA DE AUTENTICACIÓN Y SINCRONIZACIÓN ---
+      // 1. ESTADOS DE CONTROL Y AUTENTICACIÓN
       const [user, setUser] = useState(null);
       const [authLoading, setAuthLoading] = useState(true);
       const [loginForm, setLoginForm] = useState({ email: '', password: '' });
       const [loginError, setLoginError] = useState('');
-
+      const [showPassword, setShowPassword] = useState(false);
       const [loadingCloud, setLoadingCloud] = useState(true);
       const [globalData, setGlobalData] = useState({});
 
-      // Escuchar cambios de Auth
+      // 2. ESTADOS DE INTERFAZ LOCAL
+      const [activeTab, setActiveTab] = useState('finances');
+      const [selectedDate, setSelectedDate] = useState(getTodayString());
+      const [isEditingHabits, setIsEditingHabits] = useState(false);
+      const [newHabit, setNewHabit] = useState({ text: '', startTime: '', endTime: '', category: 'rutina' });
+      const [expandedDay, setExpandedDay] = useState('Lunes');
+      const [newTask, setNewTask] = useState({ text: '', time: '' });
+      const [healthForm, setHealthForm] = useState({ meal: '', symptoms: 'Ninguno', painLevel: 1 });
+      const [financeFilter, setFinanceFilter] = useState('mes'); 
+      const [financeForm, setFinanceForm] = useState({ id: null, type: 'egreso', amount: '', description: '', account: 'nequi', toAccount: 'nubank', category: 'variable', date: getTodayString() });
+      const [isEditingGym, setIsEditingGym] = useState(false);
+      const [newRoutine, setNewRoutine] = useState({ day: 'Lunes', focus: '', duration: 60 });
+      const [cardioPrompt, setCardioPrompt] = useState({ isOpen: false, routineId: null });
+
+      // 3. EFECTOS DE FIREBASE
       useEffect(() => {
         const unsubscribe = auth.onAuthStateChanged((u) => {
           setUser(u);
@@ -175,7 +195,6 @@
         return () => unsubscribe();
       }, []);
 
-      // Escuchar Base de Datos SOLO si hay usuario
       useEffect(() => {
         if (!user) return;
         setLoadingCloud(true);
@@ -193,13 +212,31 @@
         return () => unsubscribe();
       }, [user]);
 
+      // 4. FUNCIONES DE LOGIN MEJORADAS
       const handleLogin = async (e) => {
         e.preventDefault();
         setLoginError('');
         try {
-          await auth.signInWithEmailAndPassword(loginForm.email, loginForm.password);
+          // Limpiamos los espacios accidentales antes de enviar a Firebase
+          const emailTrimmed = loginForm.email.trim(); 
+          await auth.signInWithEmailAndPassword(emailTrimmed, loginForm.password);
         } catch (error) {
-          setLoginError('Acceso denegado. Credenciales incorrectas.');
+          console.error("Detalle del error:", error);
+          
+          // Traductor de errores de Firebase para el usuario
+          if (error.code === 'auth/invalid-credential') {
+             setLoginError('El correo o la contraseña no coinciden con la base de datos.');
+          } else if (error.code === 'auth/user-not-found') {
+             setLoginError('Este correo no está registrado en Firebase.');
+          } else if (error.code === 'auth/wrong-password') {
+             setLoginError('Contraseña incorrecta.');
+          } else if (error.code === 'auth/too-many-requests') {
+             setLoginError('Demasiados intentos fallidos. Por seguridad, Firebase ha bloqueado el acceso unos minutos. Intenta más tarde.');
+          } else if (error.code === 'auth/api-key-not-valid') {
+             setLoginError('Error de sistema: La API Key de Firebase ingresada en el código es inválida o incorrecta. Por favor, corrígela en tu archivo.');
+          } else {
+             setLoginError(`Error del servidor: ${error.message}`);
+          }
         }
       };
 
@@ -207,7 +244,7 @@
         auth.signOut();
       };
 
-      // Hook mágico de Firebase
+      // 5. HOOK MÁGICO DE SINCRONIZACIÓN
       const useCloudState = (key, initialValue) => {
         const value = globalData[key] !== undefined ? globalData[key] : initialValue;
         const setValue = useCallback((updater) => {
@@ -223,9 +260,7 @@
         return [value, setValue];
       };
 
-      const [activeTab, setActiveTab] = useState('finances');
-
-      // --- ESTADOS SINCRONIZADOS ---
+      // 6. ESTADOS SINCRONIZADOS
       const [habitsList, setHabitsList] = useCloudState('habitsList', INITIAL_HABITS_TEMPLATE);
       const [habitCompletions, setHabitCompletions] = useCloudState('habitCompletions', {});
       const [finances, setFinances] = useCloudState('finances', []); 
@@ -243,98 +278,12 @@
       ]);
       const [bodyMetrics, setBodyMetrics] = useCloudState('bodyMetrics', { weight: '', height: '' });
 
-      // --- ESTADOS LOCALES (INTERFAZ) ---
-      const [selectedDate, setSelectedDate] = useState(getTodayString());
-      const [isEditingHabits, setIsEditingHabits] = useState(false);
-      const [newHabit, setNewHabit] = useState({ text: '', startTime: '', endTime: '', category: 'rutina' });
-      const [expandedDay, setExpandedDay] = useState('Lunes');
-      const [newTask, setNewTask] = useState({ text: '', time: '' });
-      const [healthForm, setHealthForm] = useState({ meal: '', symptoms: 'Ninguno', painLevel: 1 });
-      const [financeFilter, setFinanceFilter] = useState('mes'); 
-      const [financeForm, setFinanceForm] = useState({ id: null, type: 'egreso', amount: '', description: '', account: 'nequi', toAccount: 'nubank', category: 'variable', date: getTodayString() });
-      const [isEditingGym, setIsEditingGym] = useState(false);
-      const [newRoutine, setNewRoutine] = useState({ day: 'Lunes', focus: '', duration: 60 });
-      const [cardioPrompt, setCardioPrompt] = useState({ isOpen: false, routineId: null });
-
-      // --- RENDERIZADO DEL LOGIN SI NO ESTÁ AUTENTICADO ---
-      if (authLoading) {
-        return <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-slate-500">Cargando...</div>;
-      }
-
-      if (!user) {
-        return (
-          <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 animate-in fade-in">
-            <div className="w-full max-w-md bg-slate-800 border border-slate-700 rounded-2xl p-8 shadow-2xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-4 opacity-10"><Shield className="w-32 h-32 text-emerald-500" /></div>
-              
-              <div className="relative z-10">
-                <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-blue-500 rounded-xl flex items-center justify-center mb-6 shadow-lg shadow-emerald-500/20 text-white font-bold text-xl">A</div>
-                <h1 className="text-3xl font-extrabold text-white mb-2">Adventure</h1>
-                <p className="text-slate-400 text-sm mb-8">Base de datos protegida. Ingresa tu llave de acceso para continuar a tu panel de control.</p>
-
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <div>
-                    <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1 block">Correo de Administrador</label>
-                    <input 
-                      type="email" required value={loginForm.email} onChange={(e) => setLoginForm({...loginForm, email: e.target.value})}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white outline-none focus:border-emerald-500 transition-colors"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1 block">Contraseña de Seguridad</label>
-                    <input 
-                      type="password" required value={loginForm.password} onChange={(e) => setLoginForm({...loginForm, password: e.target.value})}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white outline-none focus:border-emerald-500 transition-colors"
-                    />
-                  </div>
-                  
-                  {loginError && <p className="text-red-400 text-xs font-medium bg-red-500/10 border border-red-500/20 p-2 rounded">{loginError}</p>}
-                  
-                  <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg transition-colors mt-4 shadow-lg shadow-emerald-500/20">
-                    Desbloquear Sistema
-                  </button>
-                </form>
-              </div>
-            </div>
-            <p className="text-slate-600 text-xs mt-6 flex items-center gap-1"><Shield className="w-3 h-3"/> Protegido con Firebase Auth 256-bit</p>
-          </div>
-        );
-      }
-
-      // ================= LÓGICA DE HÁBITOS =================
+      // 7. LÓGICA MEMORIZADA
       const validHabitIds = useMemo(() => new Set(habitsList.map(h => h.id)), [habitsList]);
       
       const currentCompletedIds = useMemo(() => {
         return (habitCompletions[selectedDate] || []).filter(id => validHabitIds.has(id));
       }, [habitCompletions, selectedDate, validHabitIds]);
-
-      const toggleHabitCompletion = (id) => {
-        setHabitCompletions(prev => {
-          const dayCompletions = prev[selectedDate] || [];
-          const isCompleted = dayCompletions.includes(id);
-          return {
-            ...prev,
-            [selectedDate]: isCompleted ? dayCompletions.filter(habitId => habitId !== id) : [...dayCompletions, id]
-          };
-        });
-      };
-
-      const handleUpdateHabit = (id, field, value) => setHabitsList(habitsList.map(h => h.id === id ? { ...h, [field]: value } : h));
-      
-      const handleDeleteHabit = (id) => {
-        setHabitsList(habitsList.filter(h => h.id !== id));
-        setHabitCompletions(prev => {
-          const updated = { ...prev };
-          Object.keys(updated).forEach(date => updated[date] = updated[date].filter(cId => cId !== id));
-          return updated;
-        });
-      };
-
-      const handleAddHabit = () => {
-        if (!newHabit.text.trim()) return;
-        setHabitsList([...habitsList, { id: Date.now(), ...newHabit }]);
-        setNewHabit({ text: '', startTime: '', endTime: '', category: 'rutina' });
-      };
 
       const habitAnalytics = useMemo(() => {
         const stats = { currentWeekScore: 0, previousWeekScore: 0, trend: 0, strongestHabit: null, weakestHabit: null, categoryCompliance: {}, streaks: {}, trendData: [] };
@@ -406,65 +355,6 @@
         return stats;
       }, [habitsList, habitCompletions, selectedDate, validHabitIds]);
 
-
-      // ================= LÓGICA DE METAS Y SALUD =================
-      const addTaskToDay = (dayIndex) => {
-        if (!newTask.text.trim()) return;
-        const updatedGoals = [...weeklyGoals];
-        updatedGoals[dayIndex].tasks.push({ id: Date.now(), text: newTask.text, time: newTask.time, status: 'sin_empezar', is8020: true });
-        setWeeklyGoals(updatedGoals); setNewTask({ text: '', time: '' });
-      };
-      const updateTaskStatus = (dayIndex, taskId, newStatus) => {
-        const updatedGoals = [...weeklyGoals];
-        updatedGoals[dayIndex].tasks = updatedGoals[dayIndex].tasks.map(t => t.id === taskId ? { ...t, status: newStatus } : t);
-        setWeeklyGoals(updatedGoals);
-      };
-      const deleteTask = (dayIndex, taskId) => {
-        const updatedGoals = [...weeklyGoals];
-        updatedGoals[dayIndex].tasks = updatedGoals[dayIndex].tasks.filter(t => t.id !== taskId);
-        setWeeklyGoals(updatedGoals);
-      };
-      const updateDailyGoal = (dayIndex, text) => {
-        const updatedGoals = [...weeklyGoals]; updatedGoals[dayIndex].dailyGoal = text; setWeeklyGoals(updatedGoals);
-      };
-
-      const addHealthLog = (e) => {
-        e.preventDefault(); if (!healthForm.meal) return;
-        setHealthLogs([{ id: Date.now(), date: new Date().toLocaleString(), ...healthForm }, ...healthLogs]);
-        setHealthForm({ meal: '', symptoms: 'Ninguno', painLevel: 1 });
-      };
-      
-      // ================= LÓGICA DE GYM AVANZADA =================
-      const toggleGymDay = (id) => {
-        const routine = gymRoutine.find(g => g.id === id);
-        if (!routine.completed) {
-          setCardioPrompt({ isOpen: true, routineId: id });
-        } else {
-          setGymRoutine(gymRoutine.map(g => g.id === id ? { ...g, completed: false, isCardioDone: false } : g));
-        }
-      };
-
-      const handleCardioResponse = (didCardio) => {
-        setGymRoutine(gymRoutine.map(g => 
-          g.id === cardioPrompt.routineId ? { ...g, completed: true, isCardioDone: didCardio } : g
-        ));
-        setCardioPrompt({ isOpen: false, routineId: null });
-      };
-      
-      const handleUpdateGymRoutine = (id, field, value) => {
-        setGymRoutine(gymRoutine.map(g => g.id === id ? { ...g, [field]: value } : g));
-      };
-
-      const handleAddRoutine = () => {
-        if (!newRoutine.focus.trim()) return;
-        setGymRoutine([...gymRoutine, { id: Date.now(), ...newRoutine, isCardioDone: false, completed: false }]);
-        setNewRoutine({ day: 'Lunes', focus: '', duration: 60 });
-      };
-
-      const handleDeleteRoutine = (id) => {
-        setGymRoutine(gymRoutine.filter(g => g.id !== id));
-      };
-
       const gymAnalytics = useMemo(() => {
         let vitalityPoints = 0;
         let completedCount = 0;
@@ -517,8 +407,6 @@
         return { vitalityPoints, topMuscle, progress, mic, micStatus };
       }, [gymRoutine, bodyMetrics]);
 
-
-      // ================= LÓGICA DE FINANZAS =================
       const financeData = useMemo(() => {
         const balances = { nubank: 2360000, nequi: 0, efectivo: 0 };
         let totalIngresosFiltrados = 0; let totalEgresosFiltrados = 0;
@@ -553,6 +441,18 @@
         return { balances, totalBalance, totalIngresos: totalIngresosFiltrados, totalEgresos: totalEgresosFiltrados, filteredList, estimatedMonthlyYield, ingresosFijos, ingresosVariables, gastosFijos, gastosVariables, ahorroRegistrado, libreTotal };
       }, [finances, financeFilter]);
 
+      // 8. FUNCIONES DE ACCIÓN
+      const toggleHabitCompletion = (id) => {
+        setHabitCompletions(prev => {
+          const dayCompletions = prev[selectedDate] || [];
+          const isCompleted = dayCompletions.includes(id);
+          return {
+            ...prev,
+            [selectedDate]: isCompleted ? dayCompletions.filter(habitId => habitId !== id) : [...dayCompletions, id]
+          };
+        });
+      };
+
       const handleAddOrEditTransaction = (e) => {
         e.preventDefault(); if (!financeForm.amount || !financeForm.description) return;
         const amountNum = parseFloat(financeForm.amount);
@@ -566,8 +466,124 @@
       const handleEditTransactionClick = (item) => { setFinanceForm({...item, toAccount: item.toAccount || 'nubank', category: item.category || 'variable'}); window.scrollTo({ top: 0, behavior: 'smooth' }); };
       const handleDeleteTransaction = (id) => { if(confirm("¿Estás seguro de eliminar este movimiento?")) setFinances(finances.filter(f => f.id !== id)); };
 
+      const addTaskToDay = (dayIndex) => {
+        if (!newTask.text.trim()) return;
+        const updatedGoals = [...weeklyGoals];
+        updatedGoals[dayIndex].tasks.push({ id: Date.now(), text: newTask.text, time: newTask.time, status: 'sin_empezar', is8020: true });
+        setWeeklyGoals(updatedGoals); setNewTask({ text: '', time: '' });
+      };
+      const updateTaskStatus = (dayIndex, taskId, newStatus) => {
+        const updatedGoals = [...weeklyGoals];
+        updatedGoals[dayIndex].tasks = updatedGoals[dayIndex].tasks.map(t => t.id === taskId ? { ...t, status: newStatus } : t);
+        setWeeklyGoals(updatedGoals);
+      };
+      const deleteTask = (dayIndex, taskId) => {
+        const updatedGoals = [...weeklyGoals];
+        updatedGoals[dayIndex].tasks = updatedGoals[dayIndex].tasks.filter(t => t.id !== taskId);
+        setWeeklyGoals(updatedGoals);
+      };
+      const updateDailyGoal = (dayIndex, text) => {
+        const updatedGoals = [...weeklyGoals]; updatedGoals[dayIndex].dailyGoal = text; setWeeklyGoals(updatedGoals);
+      };
 
-      // ================= RENDERIZADO DE PESTAÑAS =================
+      const addHealthLog = (e) => {
+        e.preventDefault(); if (!healthForm.meal) return;
+        setHealthLogs([{ id: Date.now(), date: new Date().toLocaleString(), ...healthForm }, ...healthLogs]);
+        setHealthForm({ meal: '', symptoms: 'Ninguno', painLevel: 1 });
+      };
+
+      const toggleGymDay = (id) => {
+        const routine = gymRoutine.find(g => g.id === id);
+        if (!routine.completed) {
+          setCardioPrompt({ isOpen: true, routineId: id });
+        } else {
+          setGymRoutine(gymRoutine.map(g => g.id === id ? { ...g, completed: false, isCardioDone: false } : g));
+        }
+      };
+
+      const handleCardioResponse = (didCardio) => {
+        setGymRoutine(gymRoutine.map(g => 
+          g.id === cardioPrompt.routineId ? { ...g, completed: true, isCardioDone: didCardio } : g
+        ));
+        setCardioPrompt({ isOpen: false, routineId: null });
+      };
+      
+      const handleUpdateGymRoutine = (id, field, value) => {
+        setGymRoutine(gymRoutine.map(g => g.id === id ? { ...g, [field]: value } : g));
+      };
+
+      const handleAddRoutine = () => {
+        if (!newRoutine.focus.trim()) return;
+        setGymRoutine([...gymRoutine, { id: Date.now(), ...newRoutine, isCardioDone: false, completed: false }]);
+        setNewRoutine({ day: 'Lunes', focus: '', duration: 60 });
+      };
+
+      const handleDeleteRoutine = (id) => {
+        setGymRoutine(gymRoutine.filter(g => g.id !== id));
+      };
+
+      // --- CONDICIONALES DE RENDERIZADO PRINCIPALES ---
+      
+      // 1. Pantalla de carga inicial de Firebase
+      if (authLoading) {
+        return <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-slate-500">Comprobando seguridad...</div>;
+      }
+
+      // 2. Pantalla de Login (Si no hay sesión)
+      if (!user) {
+        return (
+          <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 animate-in fade-in">
+            <div className="w-full max-w-md bg-slate-800 border border-slate-700 rounded-2xl p-8 shadow-2xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-4 opacity-10"><Shield className="w-32 h-32 text-emerald-500" /></div>
+              
+              <div className="relative z-10">
+                <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-blue-500 rounded-xl flex items-center justify-center mb-6 shadow-lg shadow-emerald-500/20 text-white font-bold text-xl">A</div>
+                <h1 className="text-3xl font-extrabold text-white mb-2">Adventure</h1>
+                <p className="text-slate-400 text-sm mb-8">Base de datos protegida. Ingresa tu llave de acceso para continuar a tu panel de control.</p>
+
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1 block">Correo de Administrador</label>
+                    <input 
+                      type="email" required value={loginForm.email} onChange={(e) => setLoginForm({...loginForm, email: e.target.value})}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white outline-none focus:border-emerald-500 transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1 block">Contraseña de Seguridad</label>
+                    <div className="relative">
+                      <input 
+                        type={showPassword ? "text" : "password"} 
+                        required 
+                        value={loginForm.password} 
+                        onChange={(e) => setLoginForm({...loginForm, password: e.target.value})}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white outline-none focus:border-emerald-500 transition-colors pr-12"
+                      />
+                      <button 
+                        type="button" 
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-500 hover:text-emerald-400 transition-colors p-1"
+                      >
+                        {showPassword ? <EyeOff className="w-5 h-5"/> : <Eye className="w-5 h-5"/>}
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {loginError && <p className="text-red-400 text-xs font-medium bg-red-500/10 border border-red-500/20 p-3 rounded leading-relaxed">{loginError}</p>}
+                  
+                  <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg transition-colors mt-4 shadow-lg shadow-emerald-500/20">
+                    Desbloquear Sistema
+                  </button>
+                </form>
+              </div>
+            </div>
+            <p className="text-slate-600 text-xs mt-6 flex items-center gap-1"><Shield className="w-3 h-3"/> Protegido con Firebase Auth 256-bit</p>
+          </div>
+        );
+      }
+
+
+      // ================= RENDERIZADO DE PESTAÑAS (Si está logueado) =================
       const renderHabits = () => (
         <div className="space-y-6 animate-in fade-in">
           <div className="flex flex-col sm:flex-row justify-between items-center bg-slate-800 p-4 rounded-2xl shadow-lg border border-slate-700 gap-4">
@@ -969,7 +985,6 @@
         </div>
       );
 
-      // (Las funciones renderGoals, renderHealth, renderGym quedan igual y están funcionales)
       const renderGoals = () => (
         <div className="space-y-6 animate-in fade-in">
           <div className="bg-gradient-to-r from-blue-900 to-slate-800 p-6 rounded-2xl shadow-lg border border-blue-800">
