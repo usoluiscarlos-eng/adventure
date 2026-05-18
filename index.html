@@ -59,7 +59,7 @@
     const { useState, useEffect, useMemo, useCallback } = React;
 
     // =========================================================================
-    // CONFIGURACIÓN OFICIAL DE FIREBASE (CORREGIDA)
+    // CONFIGURACIÓN OFICIAL DE FIREBASE
     // =========================================================================
     const firebaseConfig = {
       apiKey: "AIzaSyCvUVDUuHfRfY0caqvKFHLK7l3OqaGgVoY",
@@ -70,7 +70,6 @@
       messagingSenderId: "900482922133",
       appId: "1:900482922133:web:fb4a1ab83ad71f5f968d9c"
     };
-    // =========================================================================
 
     if (!firebase.apps.length) {
       firebase.initializeApp(firebaseConfig);
@@ -217,13 +216,11 @@
         e.preventDefault();
         setLoginError('');
         try {
-          // Limpiamos los espacios accidentales antes de enviar a Firebase
           const emailTrimmed = loginForm.email.trim(); 
           await auth.signInWithEmailAndPassword(emailTrimmed, loginForm.password);
         } catch (error) {
           console.error("Detalle del error:", error);
           
-          // Traductor de errores de Firebase para el usuario
           if (error.code === 'auth/invalid-credential') {
              setLoginError('El correo o la contraseña no coinciden con la base de datos.');
           } else if (error.code === 'auth/user-not-found') {
@@ -244,11 +241,11 @@
         auth.signOut();
       };
 
-      // 5. HOOK MÁGICO DE SINCRONIZACIÓN
+      // 5. HOOK MÁGICO DE SINCRONIZACIÓN (Corregido para Updates instantáneos)
       const useCloudState = (key, initialValue) => {
         const value = globalData[key] !== undefined ? globalData[key] : initialValue;
         const setValue = useCallback((updater) => {
-          if (!user) return; // Si no hay usuario no guarda
+          if (!user) return; 
           setGlobalData(prev => {
             const oldValue = prev[key] !== undefined ? prev[key] : initialValue;
             const newValue = typeof updater === 'function' ? updater(oldValue) : updater;
@@ -415,9 +412,19 @@
 
         finances.forEach(t => {
            const acc = t.account || 'efectivo';
-           if (t.type === 'ingreso') balances[acc] += t.amount;
-           else if (t.type === 'egreso') balances[acc] -= t.amount;
-           else if (t.type === 'transferencia') { balances[acc] -= t.amount; if (t.toAccount) balances[t.toAccount] += t.amount; }
+           
+           if (t.type === 'ingreso') {
+               balances[acc] += t.amount;
+           } else if (t.type === 'egreso') {
+               balances[acc] -= t.amount;
+               // NUEVA LÓGICA DE AHORRO: El dinero clasificado como ahorro va directo a NuBank
+               if (t.category === 'ahorro') {
+                   balances['nubank'] += t.amount;
+               }
+           } else if (t.type === 'transferencia') {
+               balances[acc] -= t.amount;
+               if (t.toAccount) balances[t.toAccount] += t.amount;
+           }
         });
 
         const today = new Date(); let limitDate = new Date(0);
@@ -429,8 +436,16 @@
 
         filteredList.forEach(t => {
            const cat = t.category || (t.type === 'ingreso' ? 'variable' : 'variable');
-           if (t.type === 'ingreso') { totalIngresosFiltrados += t.amount; if (cat === 'fijo') ingresosFijos += t.amount; else ingresosVariables += t.amount; } 
-           else if (t.type === 'egreso') { totalEgresosFiltrados += t.amount; if (cat === 'fijo') gastosFijos += t.amount; else if (cat === 'ahorro') ahorroRegistrado += t.amount; else gastosVariables += t.amount; }
+           if (t.type === 'ingreso') { 
+               totalIngresosFiltrados += t.amount; 
+               if (cat === 'fijo') ingresosFijos += t.amount; 
+               else ingresosVariables += t.amount; 
+           } else if (t.type === 'egreso') { 
+               totalEgresosFiltrados += t.amount; 
+               if (cat === 'fijo') gastosFijos += t.amount; 
+               else if (cat === 'ahorro') ahorroRegistrado += t.amount; 
+               else gastosVariables += t.amount; 
+           }
         });
 
         const totalBalance = balances.nubank + balances.nequi + balances.efectivo;
@@ -441,7 +456,7 @@
         return { balances, totalBalance, totalIngresos: totalIngresosFiltrados, totalEgresos: totalEgresosFiltrados, filteredList, estimatedMonthlyYield, ingresosFijos, ingresosVariables, gastosFijos, gastosVariables, ahorroRegistrado, libreTotal };
       }, [finances, financeFilter]);
 
-      // 8. FUNCIONES DE ACCIÓN
+      // 8. FUNCIONES DE ACCIÓN A PRUEBA DE FALLOS (Uso estricto de `prev`)
       const toggleHabitCompletion = (id) => {
         setHabitCompletions(prev => {
           const dayCompletions = prev[selectedDate] || [];
@@ -458,37 +473,60 @@
         const amountNum = parseFloat(financeForm.amount);
         const finalForm = { ...financeForm, amount: amountNum };
         if (finalForm.type !== 'transferencia') finalForm.toAccount = null;
-        if (financeForm.id) setFinances(finances.map(f => f.id === financeForm.id ? finalForm : f));
-        else setFinances([{ ...finalForm, id: Date.now() }, ...finances]);
+        
+        if (financeForm.id) {
+            setFinances(prev => prev.map(f => f.id === financeForm.id ? finalForm : f));
+        } else {
+            setFinances(prev => [{ ...finalForm, id: Date.now() }, ...prev]);
+        }
         setFinanceForm({ id: null, type: 'egreso', amount: '', description: '', account: 'nequi', toAccount: 'nubank', category: 'variable', date: getTodayString() });
       };
 
-      const handleEditTransactionClick = (item) => { setFinanceForm({...item, toAccount: item.toAccount || 'nubank', category: item.category || 'variable'}); window.scrollTo({ top: 0, behavior: 'smooth' }); };
-      const handleDeleteTransaction = (id) => { if(confirm("¿Estás seguro de eliminar este movimiento?")) setFinances(finances.filter(f => f.id !== id)); };
+      const handleEditTransactionClick = (item) => { 
+          setFinanceForm({...item, toAccount: item.toAccount || 'nubank', category: item.category || 'variable'}); 
+          window.scrollTo({ top: 0, behavior: 'smooth' }); 
+      };
+
+      const handleDeleteTransaction = (id) => { 
+          if(window.confirm("¿Estás seguro de eliminar este movimiento?")) {
+              setFinances(prev => prev.filter(f => f.id !== id)); 
+          }
+      };
 
       const addTaskToDay = (dayIndex) => {
         if (!newTask.text.trim()) return;
-        const updatedGoals = [...weeklyGoals];
-        updatedGoals[dayIndex].tasks.push({ id: Date.now(), text: newTask.text, time: newTask.time, status: 'sin_empezar', is8020: true });
-        setWeeklyGoals(updatedGoals); setNewTask({ text: '', time: '' });
+        setWeeklyGoals(prev => {
+            const updated = [...prev];
+            updated[dayIndex] = { ...updated[dayIndex], tasks: [...updated[dayIndex].tasks, { id: Date.now(), text: newTask.text, time: newTask.time, status: 'sin_empezar', is8020: true }] };
+            return updated;
+        });
+        setNewTask({ text: '', time: '' });
       };
       const updateTaskStatus = (dayIndex, taskId, newStatus) => {
-        const updatedGoals = [...weeklyGoals];
-        updatedGoals[dayIndex].tasks = updatedGoals[dayIndex].tasks.map(t => t.id === taskId ? { ...t, status: newStatus } : t);
-        setWeeklyGoals(updatedGoals);
+        setWeeklyGoals(prev => {
+            const updated = [...prev];
+            updated[dayIndex] = { ...updated[dayIndex], tasks: updated[dayIndex].tasks.map(t => t.id === taskId ? { ...t, status: newStatus } : t) };
+            return updated;
+        });
       };
       const deleteTask = (dayIndex, taskId) => {
-        const updatedGoals = [...weeklyGoals];
-        updatedGoals[dayIndex].tasks = updatedGoals[dayIndex].tasks.filter(t => t.id !== taskId);
-        setWeeklyGoals(updatedGoals);
+        setWeeklyGoals(prev => {
+            const updated = [...prev];
+            updated[dayIndex] = { ...updated[dayIndex], tasks: updated[dayIndex].tasks.filter(t => t.id !== taskId) };
+            return updated;
+        });
       };
       const updateDailyGoal = (dayIndex, text) => {
-        const updatedGoals = [...weeklyGoals]; updatedGoals[dayIndex].dailyGoal = text; setWeeklyGoals(updatedGoals);
+        setWeeklyGoals(prev => {
+            const updated = [...prev];
+            updated[dayIndex] = { ...updated[dayIndex], dailyGoal: text };
+            return updated;
+        });
       };
 
       const addHealthLog = (e) => {
         e.preventDefault(); if (!healthForm.meal) return;
-        setHealthLogs([{ id: Date.now(), date: new Date().toLocaleString(), ...healthForm }, ...healthLogs]);
+        setHealthLogs(prev => [{ id: Date.now(), date: new Date().toLocaleString(), ...healthForm }, ...prev]);
         setHealthForm({ meal: '', symptoms: 'Ninguno', painLevel: 1 });
       };
 
@@ -497,39 +535,37 @@
         if (!routine.completed) {
           setCardioPrompt({ isOpen: true, routineId: id });
         } else {
-          setGymRoutine(gymRoutine.map(g => g.id === id ? { ...g, completed: false, isCardioDone: false } : g));
+          setGymRoutine(prev => prev.map(g => g.id === id ? { ...g, completed: false, isCardioDone: false } : g));
         }
       };
 
       const handleCardioResponse = (didCardio) => {
-        setGymRoutine(gymRoutine.map(g => 
+        setGymRoutine(prev => prev.map(g => 
           g.id === cardioPrompt.routineId ? { ...g, completed: true, isCardioDone: didCardio } : g
         ));
         setCardioPrompt({ isOpen: false, routineId: null });
       };
       
       const handleUpdateGymRoutine = (id, field, value) => {
-        setGymRoutine(gymRoutine.map(g => g.id === id ? { ...g, [field]: value } : g));
+        setGymRoutine(prev => prev.map(g => g.id === id ? { ...g, [field]: value } : g));
       };
 
       const handleAddRoutine = () => {
         if (!newRoutine.focus.trim()) return;
-        setGymRoutine([...gymRoutine, { id: Date.now(), ...newRoutine, isCardioDone: false, completed: false }]);
+        setGymRoutine(prev => [...prev, { id: Date.now(), ...newRoutine, isCardioDone: false, completed: false }]);
         setNewRoutine({ day: 'Lunes', focus: '', duration: 60 });
       };
 
       const handleDeleteRoutine = (id) => {
-        setGymRoutine(gymRoutine.filter(g => g.id !== id));
+        setGymRoutine(prev => prev.filter(g => g.id !== id));
       };
 
       // --- CONDICIONALES DE RENDERIZADO PRINCIPALES ---
       
-      // 1. Pantalla de carga inicial de Firebase
       if (authLoading) {
         return <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-slate-500">Comprobando seguridad...</div>;
       }
 
-      // 2. Pantalla de Login (Si no hay sesión)
       if (!user) {
         return (
           <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 animate-in fade-in">
