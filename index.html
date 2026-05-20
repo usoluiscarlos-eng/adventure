@@ -185,6 +185,10 @@
       const [newRoutine, setNewRoutine] = useState({ day: 'Lunes', focus: '', duration: 60 });
       const [cardioPrompt, setCardioPrompt] = useState({ isOpen: false, routineId: null });
 
+      // Nuevo Estado para ajustar Saldos Base (Soluciona el problema de saldos negativos)
+      const [isEditingBalances, setIsEditingBalances] = useState(false);
+      const [tempBalances, setTempBalances] = useState({ nubank: 0, nequi: 0, efectivo: 0 });
+
       // 3. EFECTOS DE FIREBASE
       useEffect(() => {
         const unsubscribe = auth.onAuthStateChanged((u) => {
@@ -220,7 +224,6 @@
           await auth.signInWithEmailAndPassword(emailTrimmed, loginForm.password);
         } catch (error) {
           console.error("Detalle del error:", error);
-          
           if (error.code === 'auth/invalid-credential') {
              setLoginError('El correo o la contraseña no coinciden con la base de datos.');
           } else if (error.code === 'auth/user-not-found') {
@@ -274,8 +277,10 @@
         { id: 7, day: 'Domingo', focus: 'Descanso Total', duration: 0, isCardioDone: false, completed: false },
       ]);
       const [bodyMetrics, setBodyMetrics] = useCloudState('bodyMetrics', { weight: '', height: '' });
+      // SALDOS BASE (Para evitar balances negativos)
+      const [baseBalances, setBaseBalances] = useCloudState('baseBalances', { nubank: 2360000, nequi: 0, efectivo: 0 });
 
-      // 7. LÓGICA MEMORIZADA
+      // 7. LÓGICA MEMORIZADA (Soluciona Bug y Error #310)
       const validHabitIds = useMemo(() => new Set(habitsList.map(h => h.id)), [habitsList]);
       
       const currentCompletedIds = useMemo(() => {
@@ -321,9 +326,10 @@
               percentage: Math.round((hits / totalHabits) * 100), isSelected: dateStr === selectedDate
             });
             habitsList.forEach(h => {
-              if(stats.categoryCompliance[h.category]) {
-                stats.categoryCompliance[h.category].total++;
-                if (completedIds.includes(h.id)) stats.categoryCompliance[h.category].hits++;
+              const catKey = h.category || 'rutina';
+              if(stats.categoryCompliance[catKey]) {
+                stats.categoryCompliance[catKey].total++;
+                if (completedIds.includes(h.id)) stats.categoryCompliance[catKey].hits++;
               }
             });
           } else { previousWeekHits += hits; }
@@ -363,7 +369,7 @@
             vitalityPoints += 10; 
             if (r.isCardioDone) vitalityPoints += 5; 
 
-            const muscles = r.focus.split(/ y |,| \/ | /).map(m => m.trim().toLowerCase()).filter(m => m.length > 3 && !['rutina','descanso','total','hiit'].includes(m));
+            const muscles = (r.focus || '').split(/ y |,| \/ | /).map(m => m.trim().toLowerCase()).filter(m => m.length > 3 && !['rutina','descanso','total','hiit'].includes(m));
             muscles.forEach(m => {
               muscleCounts[m] = (muscleCounts[m] || 0) + 1;
             });
@@ -405,7 +411,9 @@
       }, [gymRoutine, bodyMetrics]);
 
       const financeData = useMemo(() => {
-        const balances = { nubank: 2360000, nequi: 0, efectivo: 0 };
+        // Inicializamos con los saldos base definidos por el usuario (Solución a balances negativos)
+        const balances = { ...baseBalances };
+        
         let totalIngresosFiltrados = 0; let totalEgresosFiltrados = 0;
         let ingresosFijos = 0, ingresosVariables = 0;
         let gastosFijos = 0, gastosVariables = 0, ahorroRegistrado = 0;
@@ -417,7 +425,7 @@
                balances[acc] += t.amount;
            } else if (t.type === 'egreso') {
                balances[acc] -= t.amount;
-               // NUEVA LÓGICA DE AHORRO: El dinero clasificado como ahorro va directo a NuBank
+               // El dinero clasificado como ahorro va directo a NuBank como auto-transferencia
                if (t.category === 'ahorro') {
                    balances['nubank'] += t.amount;
                }
@@ -454,9 +462,9 @@
         const estimatedMonthlyYield = balances.nubank * monthlyYieldRate;
 
         return { balances, totalBalance, totalIngresos: totalIngresosFiltrados, totalEgresos: totalEgresosFiltrados, filteredList, estimatedMonthlyYield, ingresosFijos, ingresosVariables, gastosFijos, gastosVariables, ahorroRegistrado, libreTotal };
-      }, [finances, financeFilter]);
+      }, [finances, financeFilter, baseBalances]);
 
-      // 8. FUNCIONES DE ACCIÓN A PRUEBA DE FALLOS (Uso estricto de `prev`)
+      // 8. FUNCIONES DE ACCIÓN A PRUEBA DE FALLOS (Uso estricto de `prev` para garantizar borrado en la nube)
       const toggleHabitCompletion = (id) => {
         setHabitCompletions(prev => {
           const dayCompletions = prev[selectedDate] || [];
@@ -487,6 +495,7 @@
           window.scrollTo({ top: 0, behavior: 'smooth' }); 
       };
 
+      // Solución al problema de borrado (usando prev estrictamente)
       const handleDeleteTransaction = (id) => { 
           if(window.confirm("¿Estás seguro de eliminar este movimiento?")) {
               setFinances(prev => prev.filter(f => f.id !== id)); 
@@ -502,6 +511,7 @@
         });
         setNewTask({ text: '', time: '' });
       };
+      
       const updateTaskStatus = (dayIndex, taskId, newStatus) => {
         setWeeklyGoals(prev => {
             const updated = [...prev];
@@ -509,6 +519,7 @@
             return updated;
         });
       };
+      
       const deleteTask = (dayIndex, taskId) => {
         setWeeklyGoals(prev => {
             const updated = [...prev];
@@ -516,6 +527,7 @@
             return updated;
         });
       };
+      
       const updateDailyGoal = (dayIndex, text) => {
         setWeeklyGoals(prev => {
             const updated = [...prev];
@@ -627,7 +639,7 @@
               <CalendarDays className="text-emerald-500 w-6 h-6" />
               <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="bg-slate-900 border border-slate-600 rounded-lg p-2 text-white outline-none focus:border-emerald-500 w-full sm:w-auto font-medium" />
             </div>
-            <button onClick={() => setIsEditingHabits(!isEditingHabits)} className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors w-full sm:w-auto justify-center ${isEditingHabits ? 'bg-emerald-600 text-white' : 'bg-slate-700 hover:bg-slate-600 text-slate-200'}`}>
+            <button onClick={() => setIsEditingHabits(prev => !prev)} className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors w-full sm:w-auto justify-center ${isEditingHabits ? 'bg-emerald-600 text-white' : 'bg-slate-700 hover:bg-slate-600 text-slate-200'}`}>
               {isEditingHabits ? <CheckCircle2 className="w-4 h-4" /> : <Settings className="w-4 h-4" />}
               {isEditingHabits ? 'Finalizar Edición' : 'Gestionar Hábitos'}
             </button>
@@ -670,10 +682,10 @@
                       <tbody className="divide-y divide-slate-800">
                         {habitsList.map((habit) => (
                           <tr key={habit.id}>
-                            <td className="py-2 px-2"><input value={habit.text} onChange={(e) => handleUpdateHabit(habit.id, 'text', e.target.value)} className="bg-slate-900 text-sm text-white border border-slate-600 rounded p-2 outline-none focus:border-emerald-500 w-full" /></td>
+                            <td className="py-2 px-2"><input value={habit.text || ''} onChange={(e) => handleUpdateHabit(habit.id, 'text', e.target.value)} className="bg-slate-900 text-sm text-white border border-slate-600 rounded p-2 outline-none focus:border-emerald-500 w-full" /></td>
                             <td className="py-2 px-2"><select value={habit.category || 'rutina'} onChange={(e) => handleUpdateHabit(habit.id, 'category', e.target.value)} className="bg-slate-900 text-xs text-white border border-slate-600 rounded p-2 outline-none focus:border-emerald-500 w-full">{Object.entries(CATEGORIES).map(([key, cat]) => <option key={key} value={key}>{cat.label}</option>)}</select></td>
-                            <td className="py-2 px-2"><input type="time" value={habit.startTime} onChange={(e) => handleUpdateHabit(habit.id, 'startTime', e.target.value)} className="bg-slate-900 text-xs text-emerald-400 border border-slate-600 rounded p-2 outline-none focus:border-emerald-500 w-full" /></td>
-                            <td className="py-2 px-2"><input type="time" value={habit.endTime} onChange={(e) => handleUpdateHabit(habit.id, 'endTime', e.target.value)} className="bg-slate-900 text-xs text-emerald-400 border border-slate-600 rounded p-2 outline-none focus:border-emerald-500 w-full" /></td>
+                            <td className="py-2 px-2"><input type="time" value={habit.startTime || ''} onChange={(e) => handleUpdateHabit(habit.id, 'startTime', e.target.value)} className="bg-slate-900 text-xs text-emerald-400 border border-slate-600 rounded p-2 outline-none focus:border-emerald-500 w-full" /></td>
+                            <td className="py-2 px-2"><input type="time" value={habit.endTime || ''} onChange={(e) => handleUpdateHabit(habit.id, 'endTime', e.target.value)} className="bg-slate-900 text-xs text-emerald-400 border border-slate-600 rounded p-2 outline-none focus:border-emerald-500 w-full" /></td>
                             <td className="py-2 pl-2"><button onClick={() => handleDeleteHabit(habit.id)} className="bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white p-2 rounded transition-colors w-full flex justify-center items-center"><Trash2 className="w-4 h-4" /></button></td>
                           </tr>
                         ))}
@@ -753,10 +765,20 @@
           {/* HEADER BINANCE STYLE - BALANCE TOTAL */}
           <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 flex flex-col md:flex-row justify-between items-center shadow-lg gap-6">
             <div>
-              <p className="text-slate-400 text-sm font-medium uppercase tracking-wider flex items-center gap-2 mb-1">
-                Balance Total (Capital Cuentas)
-              </p>
-              <h2 className="text-4xl font-extrabold text-white">{formatCurrency(financeData.totalBalance)}</h2>
+              <div className="flex items-start justify-between mb-1">
+                 <p className="text-slate-400 text-sm font-medium uppercase tracking-wider flex items-center gap-2">
+                   Balance Total (Capital Cuentas)
+                 </p>
+                 <button onClick={() => { setTempBalances(baseBalances); setIsEditingBalances(true); }} className="md:hidden text-slate-500 hover:text-emerald-400 transition-colors" title="Ajustar Saldos Base">
+                   <Settings className="w-4 h-4" />
+                 </button>
+              </div>
+              <div className="flex items-center gap-3">
+                 <h2 className="text-4xl font-extrabold text-white">{formatCurrency(financeData.totalBalance)}</h2>
+                 <button onClick={() => { setTempBalances(baseBalances); setIsEditingBalances(true); }} className="hidden md:block text-slate-500 hover:text-emerald-400 transition-colors" title="Ajustar Saldos Base">
+                   <Settings className="w-5 h-5" />
+                 </button>
+              </div>
             </div>
             
             {/* SELECTOR DE PERIODO */}
@@ -823,8 +845,8 @@
             {/* Libre Aproximado */}
             <div className="bg-yellow-500/10 border-t border-yellow-500/20 p-5 flex justify-between items-center">
               <div>
-                <span className="text-yellow-500 font-bold uppercase tracking-wider text-sm block">Libre Total Aproximado</span>
-                <span className="text-xs text-yellow-500/60">Ingresos - Gastos - Ahorro</span>
+                <span className="text-yellow-500 font-bold uppercase tracking-wider text-sm block">Balance del Periodo</span>
+                <span className="text-xs text-yellow-500/60">(Total Ingresos - Total Gastos)</span>
               </div>
               <span className="text-3xl font-extrabold text-yellow-400">{formatCurrency(financeData.libreTotal)}</span>
             </div>
@@ -918,7 +940,7 @@
                 <div className="flex gap-2">
                   <div className="flex-1">
                     <label className="text-xs text-slate-400 mb-1 block">Monto (COP)</label>
-                    <input type="number" required value={financeForm.amount} onChange={(e) => setFinanceForm({...financeForm, amount: e.target.value})} className="w-full bg-slate-900 text-white border border-slate-700 rounded-lg p-2.5 outline-none focus:border-blue-500 text-sm font-bold" placeholder="Ej. 50000" />
+                    <input type="number" required min="0" step="0.01" value={financeForm.amount} onChange={(e) => setFinanceForm({...financeForm, amount: e.target.value})} className="w-full bg-slate-900 text-white border border-slate-700 rounded-lg p-2.5 outline-none focus:border-blue-500 text-sm font-bold" placeholder="Ej. 50000" />
                   </div>
                   <div className="w-2/5">
                     <label className="text-xs text-slate-400 mb-1 block">Fecha</label>
@@ -1017,6 +1039,37 @@
               </div>
             </div>
           </div>
+          
+          {/* MODAL PARA EDITAR SALDOS BASE */}
+          {isEditingBalances && (
+            <div className="fixed inset-0 bg-slate-950/80 z-[100] flex items-center justify-center p-4 animate-in fade-in">
+              <div className="bg-slate-800 border border-slate-700 p-6 rounded-2xl max-w-sm w-full shadow-2xl">
+                <div className="flex justify-center mb-4"><Landmark className="w-12 h-12 text-emerald-400" /></div>
+                <h3 className="text-xl font-bold text-white mb-2 text-center">Ajustar Saldos Base</h3>
+                <p className="text-xs text-slate-400 mb-6 text-center">Define el dinero exacto con el que estás empezando en cada cuenta. Esto evita tener números negativos.</p>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block mb-1 text-xs font-semibold text-purple-400 uppercase tracking-wider">Saldo en NuBank</label>
+                    <input type="number" min="0" step="0.01" value={tempBalances.nubank} onChange={e => setTempBalances({...tempBalances, nubank: parseFloat(e.target.value)||0})} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white outline-none focus:border-purple-500 font-bold" />
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-xs font-semibold text-pink-400 uppercase tracking-wider">Saldo en Nequi</label>
+                    <input type="number" min="0" step="0.01" value={tempBalances.nequi} onChange={e => setTempBalances({...tempBalances, nequi: parseFloat(e.target.value)||0})} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white outline-none focus:border-pink-500 font-bold" />
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-xs font-semibold text-emerald-400 uppercase tracking-wider">Saldo en Efectivo</label>
+                    <input type="number" min="0" step="0.01" value={tempBalances.efectivo} onChange={e => setTempBalances({...tempBalances, efectivo: parseFloat(e.target.value)||0})} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white outline-none focus:border-emerald-500 font-bold" />
+                  </div>
+                </div>
+                
+                <div className="flex gap-3 mt-6">
+                   <button onClick={() => setIsEditingBalances(false)} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-3 rounded-lg font-semibold transition-colors">Cancelar</button>
+                   <button onClick={() => { setBaseBalances(tempBalances); setIsEditingBalances(false); }} className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-lg font-bold shadow-lg shadow-emerald-500/20 transition-colors">Guardar</button>
+                </div>
+              </div>
+            </div>
+          )}
 
         </div>
       );
@@ -1142,7 +1195,7 @@
                 <Dumbbell className="w-6 h-6 text-indigo-500" />
                 <h2 className="text-xl font-bold text-white">Panel de Entrenamiento</h2>
              </div>
-             <button onClick={() => setIsEditingGym(!isEditingGym)} className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors w-full sm:w-auto justify-center ${isEditingGym ? 'bg-indigo-600 text-white' : 'bg-slate-700 hover:bg-slate-600 text-slate-200'}`}>
+             <button onClick={() => setIsEditingGym(prev => !prev)} className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors w-full sm:w-auto justify-center ${isEditingGym ? 'bg-indigo-600 text-white' : 'bg-slate-700 hover:bg-slate-600 text-slate-200'}`}>
               {isEditingGym ? <CheckCircle2 className="w-4 h-4" /> : <Settings className="w-4 h-4" />}
               {isEditingGym ? 'Finalizar Edición' : 'Configurar Rutina'}
             </button>
@@ -1238,10 +1291,10 @@
                                </select>
                              </td>
                              <td className="py-2 px-2">
-                                <input type="text" value={routine.focus} onChange={(e) => handleUpdateGymRoutine(routine.id, 'focus', e.target.value)} className="bg-slate-900 text-sm text-white border border-slate-600 rounded p-2 outline-none w-full focus:border-indigo-500" placeholder="Ej. Pecho y Tríceps" />
+                                <input type="text" value={routine.focus || ''} onChange={(e) => handleUpdateGymRoutine(routine.id, 'focus', e.target.value)} className="bg-slate-900 text-sm text-white border border-slate-600 rounded p-2 outline-none w-full focus:border-indigo-500" placeholder="Ej. Pecho y Tríceps" />
                              </td>
                              <td className="py-2 px-2">
-                                <input type="number" value={routine.duration} onChange={(e) => handleUpdateGymRoutine(routine.id, 'duration', parseInt(e.target.value) || 0)} className="bg-slate-900 text-sm text-white border border-slate-600 rounded p-2 outline-none w-full focus:border-indigo-500 text-center" />
+                                <input type="number" value={routine.duration || 0} onChange={(e) => handleUpdateGymRoutine(routine.id, 'duration', parseInt(e.target.value) || 0)} className="bg-slate-900 text-sm text-white border border-slate-600 rounded p-2 outline-none w-full focus:border-indigo-500 text-center" />
                              </td>
                              <td className="py-2 pl-2">
                                 <button onClick={() => handleDeleteRoutine(routine.id)} className="bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white p-2 rounded w-full flex justify-center"><Trash2 className="w-4 h-4" /></button>
