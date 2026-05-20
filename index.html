@@ -162,7 +162,9 @@
 
 
     function App() {
-      // 1. ESTADOS DE CONTROL Y AUTENTICACIÓN
+      // =========================================================================================
+      // 1. ESTADOS DE CONTROL Y AUTENTICACIÓN (Reglas estrictas de React Hooks aplicadas)
+      // =========================================================================================
       const [user, setUser] = useState(null);
       const [authLoading, setAuthLoading] = useState(true);
       const [loginForm, setLoginForm] = useState({ email: '', password: '' });
@@ -171,7 +173,7 @@
       const [loadingCloud, setLoadingCloud] = useState(true);
       const [globalData, setGlobalData] = useState({});
 
-      // 2. ESTADOS DE INTERFAZ LOCAL
+      // ESTADOS DE INTERFAZ LOCAL
       const [activeTab, setActiveTab] = useState('finances');
       const [selectedDate, setSelectedDate] = useState(getTodayString());
       const [isEditingHabits, setIsEditingHabits] = useState(false);
@@ -184,12 +186,10 @@
       const [isEditingGym, setIsEditingGym] = useState(false);
       const [newRoutine, setNewRoutine] = useState({ day: 'Lunes', focus: '', duration: 60 });
       const [cardioPrompt, setCardioPrompt] = useState({ isOpen: false, routineId: null });
-
-      // Nuevo Estado para ajustar Saldos Base (Soluciona el problema de saldos negativos)
       const [isEditingBalances, setIsEditingBalances] = useState(false);
       const [tempBalances, setTempBalances] = useState({ nubank: 0, nequi: 0, efectivo: 0 });
 
-      // 3. EFECTOS DE FIREBASE
+      // EFECTOS DE FIREBASE
       useEffect(() => {
         const unsubscribe = auth.onAuthStateChanged((u) => {
           setUser(u);
@@ -215,7 +215,7 @@
         return () => unsubscribe();
       }, [user]);
 
-      // 4. FUNCIONES DE LOGIN MEJORADAS
+      // FUNCIONES DE LOGIN 
       const handleLogin = async (e) => {
         e.preventDefault();
         setLoginError('');
@@ -224,27 +224,17 @@
           await auth.signInWithEmailAndPassword(emailTrimmed, loginForm.password);
         } catch (error) {
           console.error("Detalle del error:", error);
-          if (error.code === 'auth/invalid-credential') {
-             setLoginError('El correo o la contraseña no coinciden con la base de datos.');
-          } else if (error.code === 'auth/user-not-found') {
-             setLoginError('Este correo no está registrado en Firebase.');
-          } else if (error.code === 'auth/wrong-password') {
-             setLoginError('Contraseña incorrecta.');
-          } else if (error.code === 'auth/too-many-requests') {
-             setLoginError('Demasiados intentos fallidos. Por seguridad, Firebase ha bloqueado el acceso unos minutos. Intenta más tarde.');
-          } else if (error.code === 'auth/api-key-not-valid') {
-             setLoginError('Error de sistema: La API Key de Firebase ingresada en el código es inválida o incorrecta. Por favor, corrígela en tu archivo.');
-          } else {
-             setLoginError(`Error del servidor: ${error.message}`);
-          }
+          if (error.code === 'auth/invalid-credential') setLoginError('El correo o la contraseña no coinciden.');
+          else if (error.code === 'auth/user-not-found') setLoginError('Este correo no está registrado.');
+          else if (error.code === 'auth/wrong-password') setLoginError('Contraseña incorrecta.');
+          else if (error.code === 'auth/too-many-requests') setLoginError('Demasiados intentos fallidos. Intenta más tarde.');
+          else setLoginError(`Error del servidor: ${error.message}`);
         }
       };
 
-      const handleLogout = () => {
-        auth.signOut();
-      };
+      const handleLogout = () => auth.signOut();
 
-      // 5. HOOK MÁGICO DE SINCRONIZACIÓN (Corregido para Updates instantáneos)
+      // HOOK MÁGICO DE SINCRONIZACIÓN
       const useCloudState = (key, initialValue) => {
         const value = globalData[key] !== undefined ? globalData[key] : initialValue;
         const setValue = useCallback((updater) => {
@@ -260,7 +250,7 @@
         return [value, setValue];
       };
 
-      // 6. ESTADOS SINCRONIZADOS
+      // ESTADOS SINCRONIZADOS
       const [habitsList, setHabitsList] = useCloudState('habitsList', INITIAL_HABITS_TEMPLATE);
       const [habitCompletions, setHabitCompletions] = useCloudState('habitCompletions', {});
       const [finances, setFinances] = useCloudState('finances', []); 
@@ -277,10 +267,9 @@
         { id: 7, day: 'Domingo', focus: 'Descanso Total', duration: 0, isCardioDone: false, completed: false },
       ]);
       const [bodyMetrics, setBodyMetrics] = useCloudState('bodyMetrics', { weight: '', height: '' });
-      // SALDOS BASE (Para evitar balances negativos)
       const [baseBalances, setBaseBalances] = useCloudState('baseBalances', { nubank: 2360000, nequi: 0, efectivo: 0 });
 
-      // 7. LÓGICA MEMORIZADA (Soluciona Bug y Error #310)
+      // LÓGICA MEMORIZADA 
       const validHabitIds = useMemo(() => new Set(habitsList.map(h => h.id)), [habitsList]);
       
       const currentCompletedIds = useMemo(() => {
@@ -411,7 +400,7 @@
       }, [gymRoutine, bodyMetrics]);
 
       const financeData = useMemo(() => {
-        // Inicializamos con los saldos base definidos por el usuario (Solución a balances negativos)
+        // Inicializamos con los saldos base definidos por el usuario
         const balances = { ...baseBalances };
         
         let totalIngresosFiltrados = 0; let totalEgresosFiltrados = 0;
@@ -425,7 +414,7 @@
                balances[acc] += t.amount;
            } else if (t.type === 'egreso') {
                balances[acc] -= t.amount;
-               // El dinero clasificado como ahorro va directo a NuBank como auto-transferencia
+               // El ahorro va directo a NuBank 
                if (t.category === 'ahorro') {
                    balances['nubank'] += t.amount;
                }
@@ -464,7 +453,7 @@
         return { balances, totalBalance, totalIngresos: totalIngresosFiltrados, totalEgresos: totalEgresosFiltrados, filteredList, estimatedMonthlyYield, ingresosFijos, ingresosVariables, gastosFijos, gastosVariables, ahorroRegistrado, libreTotal };
       }, [finances, financeFilter, baseBalances]);
 
-      // 8. FUNCIONES DE ACCIÓN A PRUEBA DE FALLOS (Uso estricto de `prev` para garantizar borrado en la nube)
+      // FUNCIONES DE ACCIÓN 
       const toggleHabitCompletion = (id) => {
         setHabitCompletions(prev => {
           const dayCompletions = prev[selectedDate] || [];
@@ -495,10 +484,17 @@
           window.scrollTo({ top: 0, behavior: 'smooth' }); 
       };
 
-      // Solución al problema de borrado (usando prev estrictamente)
       const handleDeleteTransaction = (id) => { 
           if(window.confirm("¿Estás seguro de eliminar este movimiento?")) {
               setFinances(prev => prev.filter(f => f.id !== id)); 
+          }
+      };
+
+      // Nuevo: Botón de reseteo maestro
+      const handleResetFinances = () => {
+          if(window.confirm("⚠️ ADVERTENCIA: Estás a punto de borrar TODO tu historial financiero y saldos base. ¿Estás seguro de empezar de cero?")) {
+              setFinances([]);
+              setBaseBalances({ nubank: 0, nequi: 0, efectivo: 0 });
           }
       };
 
@@ -572,7 +568,10 @@
         setGymRoutine(prev => prev.filter(g => g.id !== id));
       };
 
-      // --- CONDICIONALES DE RENDERIZADO PRINCIPALES ---
+      // =========================================================================================
+      // CONDICIONALES DE RENDERIZADO 
+      // (Esta estructura limpia evita el Error #310 de React)
+      // =========================================================================================
       
       if (authLoading) {
         return <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-slate-500">Comprobando seguridad...</div>;
@@ -781,17 +780,22 @@
               </div>
             </div>
             
-            {/* SELECTOR DE PERIODO */}
-            <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-700/50 self-stretch md:self-auto items-center">
-              {['semana', 'quincena', 'mes', 'todo'].map(period => (
-                <button 
-                  key={period}
-                  onClick={() => setFinanceFilter(period)}
-                  className={`px-4 py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-colors ${financeFilter === period ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
-                >
-                  {period}
-                </button>
-              ))}
+            {/* SELECTOR DE PERIODO Y RESET */}
+            <div className="flex flex-col sm:flex-row items-center gap-3">
+              <button onClick={handleResetFinances} className="flex items-center gap-2 text-xs bg-red-500/10 text-red-400 border border-red-500/20 px-4 py-2 rounded-lg hover:bg-red-500 hover:text-white transition-colors w-full sm:w-auto justify-center font-bold tracking-wide">
+                <Trash2 className="w-4 h-4" /> Empezar de cero
+              </button>
+              <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-700/50 w-full sm:w-auto">
+                {['semana', 'quincena', 'mes', 'todo'].map(period => (
+                  <button 
+                    key={period}
+                    onClick={() => setFinanceFilter(period)}
+                    className={`px-3 sm:px-4 py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-colors flex-1 ${financeFilter === period ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
+                  >
+                    {period}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
