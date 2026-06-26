@@ -1,40 +1,67 @@
-// Cambia esto a v2 (o v3, v4 cada vez que hagas un cambio grande)
-const CACHE_NAME = 'adventure-v2'; 
-
-const urlsToCache = [
+const CACHE_NAME = 'adventure-v3-20260626';
+const APP_SHELL = [
+  './',
   './index.html',
+  './app.js',
   './manifest.json',
+  './favicon.ico',
   './icon-192.png',
   './icon-512.png'
 ];
 
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(urlsToCache))
+    caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL))
   );
-  // Fuerza al Service Worker a activarse inmediatamente
   self.skipWaiting();
 });
 
-self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => response || fetch(event.request))
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(cacheNames => Promise.all(
+      cacheNames
+        .filter(cacheName => cacheName !== CACHE_NAME)
+        .map(cacheName => caches.delete(cacheName))
+    )).then(() => self.clients.claim())
   );
 });
 
-// Borra los cachés viejos
-self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
-  );
+self.addEventListener('fetch', event => {
+  const { request } = event;
+  const requestUrl = new URL(request.url);
+
+  if (request.mode === 'navigate' || request.destination === 'document') {
+    event.respondWith(networkFirst(request));
+    return;
+  }
+
+  if (requestUrl.origin === self.location.origin && request.method === 'GET') {
+    event.respondWith(cacheFirst(request));
+  }
 });
+
+async function networkFirst(request) {
+  const cache = await caches.open(CACHE_NAME);
+
+  try {
+    const response = await fetch(request);
+    if (response && response.ok) {
+      cache.put(request, response.clone());
+    }
+    return response;
+  } catch (error) {
+    return (await cache.match(request)) || cache.match('./index.html');
+  }
+}
+
+async function cacheFirst(request) {
+  const cache = await caches.open(CACHE_NAME);
+  const cachedResponse = await cache.match(request);
+  if (cachedResponse) return cachedResponse;
+
+  const response = await fetch(request);
+  if (response && response.ok) {
+    cache.put(request, response.clone());
+  }
+  return response;
+}
